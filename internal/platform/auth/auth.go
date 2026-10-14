@@ -2,6 +2,7 @@ package auth
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
@@ -100,6 +101,21 @@ func userActive(u *models.TtpgUser) bool {
 		return false
 	}
 	return true
+}
+
+func BasicLogin(header string) (*models.TtpgUser, error) {
+	if !strings.HasPrefix(header, "Basic ") {
+		return nil, fmt.Errorf("bukan basic auth")
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(strings.TrimPrefix(header, "Basic ")))
+	if err != nil {
+		return nil, fmt.Errorf("basic auth tidak valid")
+	}
+	parts := strings.SplitN(string(raw), ":", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("basic auth tidak valid")
+	}
+	return Login(parts[0], parts[1])
 }
 
 func Login(username, password string) (*models.TtpgUser, error) {

@@ -36,16 +36,12 @@ sqlu() {
 }
 
 echo "===== A. AUTH ====="
-req "login salah password -> 401" POST /auth/login 401 -H 'Content-Type: application/json' -d '{"username":"admin","password":"salah"}'
+req "login salah password -> 401" POST /auth 401 -H 'Content-Type: application/json' -d '{"username":"admin","password":"salah"}'
 ja "  format error standar" '.success == false'
 
-req "login benar -> 200" POST /auth/login 200 -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}'
+req "login benar -> 200" POST /auth 200 -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}'
 ja "  ada token+user_id" '.data.token != null and .data.user_id == 1'
 TOKEN=$(printf '%s' "$BODY" | jq -r .data.token)
-
-req "auth/key Basic -> 200" GET /auth/key 200 -u admin:admin123
-ja "  status true + keys" '.status == true and .data.development_key == "dev-key-123"'
-req "auth/key tanpa auth -> 401" GET /auth/key 401
 
 req "tujuan tanpa token -> 401" GET /tujuan 401
 req "tujuan dengan Bearer -> 200" GET /tujuan 200 -H "Authorization: Bearer $TOKEN"
@@ -203,7 +199,7 @@ req "POST /boarding tanpa nama -> 400" POST /boarding 400 -H "Authorization: Bea
 
 echo "===== G. RESTRIKSI po_id USER ====="
 docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg_users -e "UPDATE user SET po_id='PO001' WHERE username='admin'" 2>/dev/null
-req "login lagi (po_ids=PO001)" POST /auth/login 200 -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}'
+req "login lagi (po_ids=PO001)" POST /auth 200 -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}'
 TOKEN2=$(printf '%s' "$BODY" | jq -r .data.token)
 req "POST /boarding po_id PO002 -> 403" POST /boarding 403 -H "Authorization: Bearer $TOKEN2" -H 'Content-Type: application/json' -d '{"po_id":"PO002","ticket_id":"MB-X","destination_id":1,"date_of_departure":"2026-10-15","time_of_departure":"07:00:00","name":"Uji"}'
 req "POST /boarding tanpa po_id -> auto-fill PO001" POST /boarding 201 -H "Authorization: Bearer $TOKEN2" -H 'Content-Type: application/json' -d '{"ticket_id":"MB-AUTO","destination_id":1,"date_of_departure":"2026-10-15","time_of_departure":"07:00:00","name":"Uji"}'
@@ -218,7 +214,7 @@ req "POST /boarding dgn API key -> 403 (rule: wajib Bearer)" POST /boarding 403 
 ja "  pesan skema wajib" '.success == false and (.message | contains("bearer_token"))'
 req "GET /tujuan dgn API key -> 200 (rute tanpa baris api_url)" GET /tujuan 200 -H "X-ttpg-key: dev-key-123"
 
-req "login limited -> 200" POST /auth/login 200 -H 'Content-Type: application/json' -d '{"username":"limited","password":"limited123"}'
+req "login limited -> 200" POST /auth 200 -H 'Content-Type: application/json' -d '{"username":"limited","password":"limited123"}'
 LTOKEN=$(printf '%s' "$BODY" | jq -r .data.token)
 req "POST /boarding limited -> 403 (access.id_api=2, rule=1)" POST /boarding 403 -H "Authorization: Bearer $LTOKEN" -H 'Content-Type: application/json' -d '{"ticket_id":"X","destination_id":1,"date_of_departure":"2026-10-15","time_of_departure":"07:00:00","name":"Uji"}'
 ja "  pesan tidak memiliki akses" '.success == false and (.message | contains("akses"))'
@@ -231,7 +227,7 @@ sqlu "UPDATE user SET is_block=0 WHERE username='admin'"
 req "GET /tujuan setelah unblock -> 200" GET /tujuan 200 -H "Authorization: Bearer $TOKEN"
 
 sqlu "UPDATE user SET is_block=1 WHERE username='admin'"
-req "login user diblokir -> 401" POST /auth/login 401 -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}'
+req "login user diblokir -> 401" POST /auth 401 -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}'
 sqlu "UPDATE user SET is_block=0 WHERE username='admin'"
 
 sleep 1

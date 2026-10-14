@@ -14,7 +14,7 @@ check() {
   else FAIL=$((FAIL+1)); echo "FAIL  $1 (got '$3', expect '$2')"; fi
 }
 
-TOKEN=$(curl -s -m 5 -X POST "$BASE/auth/login" -H 'Content-Type: application/json' \
+TOKEN=$(curl -s -m 5 -X POST "$BASE/auth" -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"admin123"}' | jq -r '.data.token // empty')
 if [ -n "$TOKEN" ]; then check "login -> token" "OK" "OK"; else check "login -> token" "OK" "FAIL"; fi
 

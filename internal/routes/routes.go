@@ -36,7 +36,7 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 	apiKeyAuth.POST("/boardingpass", handler.Create)
 	apiKeyAuth.PUT("/boardingpass/:id", handler.Update)
 	apiKeyAuth.DELETE("/boardingpass/:id", handler.Delete)
-	r.POST("/auth/login", func(c *gin.Context) {
+	r.POST("/auth", func(c *gin.Context) {
 		var req struct {
 			Username string `json:"username" binding:"required"`
 			Password string `json:"password" binding:"required"`
@@ -63,8 +63,6 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 			"expire":  time.Now().Add(auth.TokenExpiry).Format(time.RFC3339),
 		}, nil)
 	})
-
-	r.GET("/auth/key", auth.KeyHandler)
 
 	api := r.Group("")
 	api.Use(auth.AuthMiddleware())

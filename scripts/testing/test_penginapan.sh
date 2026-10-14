@@ -28,7 +28,7 @@ ja() {
 jget() { printf '%s' "$BODY" | jq -r "$1"; }
 
 echo "===== A. AUTH ====="
-req "login -> 200" POST /auth/login 200 -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}'
+req "login -> 200" POST /auth 200 -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}'
 TOKEN=$(jget .data.token)
 req "configs tanpa token -> 401" GET /penginapan/configs 401
 
