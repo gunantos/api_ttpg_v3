@@ -9,6 +9,7 @@ type Config struct {
 	AuthDSN       string
 	MainDSN       string
 	PenginapanDSN string
+	UsersDSN      string
 	MongoURI      string
 	JWTSecret     string
 	Port          string
@@ -33,9 +34,10 @@ func Load() *Config {
 		AuthDSN:       getEnv("AUTH_DSN", "api2:andtho1989@tcp(192.168.1.3:3306)/ttpg_auth?parseTime=true"),
 		MainDSN:       getEnv("MAIN_DSN", "api2:andtho1989@tcp(192.168.1.3:3306)/ttpg?parseTime=true"),
 		PenginapanDSN: getEnv("PENGINAPAN_DSN", "api2:andtho1989@tcp(192.168.1.3:3306)/ttpg_penginapan?parseTime=true"),
-		MongoURI:      getEnv("MONGO_URI", "mongodb://andtho89:Andtho1989@192.168.1.3:27017/?authSource=admin"),
+		UsersDSN:      getEnv("USERS_DSN", "api2:andtho1989@tcp(192.168.1.3:3306)/ttpg_users?parseTime=true"),
+		MongoURI:      getEnv("MONGO_URI", "mongodb://admin:Andtho1989@192.168.1.3:27017/?authSource=admin&directConnection=true"),
 		JWTSecret:     getEnv("JWT_SECRET", "ttpg-secret-key-change-in-production"),
-		Port:          getEnv("PORT", "8080"),
+		Port:          getEnv("PORT", "3080"),
 
 		Bypass:                      getEnv("BYPASS", "false") == "true",
 		APIKey:                      getEnv("API_KEY", "12345"),

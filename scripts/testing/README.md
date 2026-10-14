@@ -20,45 +20,51 @@ docker exec -i ttpg-mysql mysql -uroot -proot -h127.0.0.1 -e \
 docker exec -i ttpg-mysql mysql -uroot -proot -h127.0.0.1 ttpg_penginapan \
   < ../../migrations/mysql/002_create_ttpg_penginapan.sql
 
+# skema auth ttpg_users (8 tabel + seed admin/limited; juga dimuat reset.sh):
+docker exec -i ttpg-mysql mysql -uroot -proot -h127.0.0.1 < ../../migrations/mysql/004_create_ttpg_users.sql
+
 cd ../..  # root repo
 AUTH_DSN='api2:andtho1989@tcp(127.0.0.1:13306)/ttpg_auth?parseTime=true' go run cmd/seed/main.go
 ```
 
 ## Menjalankan server untuk test
 
+Port **3080** (default skrip test). Build + jalankan dengan env lengkap:
+
 ```bash
 cd ../..
-go build -o /tmp/opencode/ttpg_server .
-PORT=8090 \
+go build -o ttpg_server .
+PORT=3080 \
 AUTH_DSN='api2:andtho1989@tcp(127.0.0.1:13306)/ttpg_auth?parseTime=true' \
 MAIN_DSN='api2:andtho1989@tcp(127.0.0.1:13306)/ttpg?parseTime=true' \
 PENGINAPAN_DSN='api2:andtho1989@tcp(127.0.0.1:13306)/ttpg_penginapan?parseTime=true' \
-MONGO_URI='mongodb://127.0.0.1:27017' /tmp/opencode/ttpg_server &
+USERS_DSN='api2:andtho1989@tcp(127.0.0.1:13306)/ttpg_users?parseTime=true' \
+MONGO_URI='mongodb://127.0.0.1:27017' ./ttpg_server &
 ```
 
-> `PENGINAPAN_DSN` **wajib** — tanpa itu server memakai default produksi dan `log.Fatalf` saat AutoMigrate bila tidak terjangkau/DB belum ada.
+> Semua DSN **wajib** lokal — tanpa itu server memakai default produksi (tidak terjangkau dari mesin test) dan `log.Fatalf`. `USERS_DSN` menyediakan login/aturan endpoint (`user`, `access`, `api_url`, `logs`).
 
 ## Skrip
 
 | Skrip | Fungsi |
 |-------|--------|
 | `reset.sh` | Reset data uji (schema + seed Mongo + row GATE002 + po_ids kosong + re-migrasi `ttpg_penginapan`) |
-| `test_api.sh` | 107 assert: auth, gate (valid/rescan/max/expired/fallback), boardingpass (CRUD: list/update/delete + get/print), checkin mandiri, boarding Mongo CRUD, restriksi po_id |
+| `test_api.sh` | 142 assert: auth (JWT/Basic/API key seragam via `ttpg_users`), aturan endpoint (`api_url` wajib Bearer → 403, akses `access.id_api` → 403, blokir user → 403, logs tercatat), boarding Mongo list (paginasi + filter `destination_id`), docs interaktif `/docs`, gate (valid/rescan/max/expired/fallback + scan via JWT/Basic), boardingpass (CRUD: list/update/delete + get/print + secret_key), checkin mandiri, boarding Mongo CRUD, restriksi po_id |
 | `test_env_flags.sh` | 5 assert: `BYPASS=true`, `LIST_ID_CARD`, kembali normal (restart server) |
-| `test_penginapan.sh` | 77 assert: configs/lookups, master lokasi/kamar/layout, check-in (lunas/pending/alokasi/kapasitas/maintenance), summary lunas, payment manual/void, checkout, pindah kamar, histories, guard delete |
+| `test_penginapan.sh` | 87 assert: configs/lookups, master lokasi/kamar/layout, check-in (lunas/pending/alokasi/kapasitas/maintenance), summary lunas, payment manual/void, checkout, pindah kamar, histories, guard delete, struk pembayaran (public + autoprint + 404), QRIS (404 belum dikonfigurasi → config → 200 payload) |
 | `test_ws.sh` | 14 assert: auth `/ws` (401 tanpa/salah token), koneksi client, event `room` (status change), event `occupancy` + `guest` (check-in) — build test client otomatis dari `wsclient/` |
 
 ```bash
 ./reset.sh
-./test_api.sh         # ekspektasi: TOTAL: PASS=107 FAIL=0
+./test_api.sh         # ekspektasi: TOTAL: PASS=142 FAIL=0
 ./test_env_flags.sh   # ekspektasi: TOTAL: PASS=5 FAIL=0
-./reset.sh && ./test_penginapan.sh   # ekspektasi: TOTAL: PASS=77 FAIL=0
+./reset.sh && ./test_penginapan.sh   # ekspektasi: TOTAL: PASS=87 FAIL=0
 ./reset.sh && ./test_ws.sh           # ekspektasi: TOTAL: PASS=14 FAIL=0
 ```
 
 Catatan:
 
-- Port aplikasi test: **8090** (8080 bisa bentrok dengan proyek lain).
+- Port aplikasi test: **3080** (port permanen; 8080 dipakai proyek lain).
 - `test_env_flags.sh` mematikan/menyalakan ulang server via `pkill` — hanya jalankan saat server test (bukan produksi).
 - Noreg yang dipakai gate: `SCAN001` (checkin), `MAXSCAN1` (count_scan=5), `EXPIRE01` (time_tab >5 menit), `OLDDATE1` (tanggal kemarin → fallback eksternal), `GATE002`/`T002` (checkin conflict).
 - Fallback API tiket (`newticket.dgti.co.id`) dan Damri tidak terjangkau dari sandbox → diverifikasi sebagai jalur gagal (`success:false` / `404`).

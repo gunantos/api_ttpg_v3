@@ -1,5 +1,5 @@
 #!/bin/bash
-BASE=${BASE:-http://127.0.0.1:8090}
+BASE=${BASE:-http://127.0.0.1:3080}
 KEY="X-ttpg-key: 12345"
 PASS=0; FAIL=0
 BODY=""; CODE=""
@@ -31,6 +31,10 @@ sqlq() {
   docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg -N -e "$1" 2>/dev/null | tr -d '\r'
 }
 
+sqlu() {
+  docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg_users -N -e "$1" 2>/dev/null | tr -d '\r'
+}
+
 echo "===== A. AUTH ====="
 req "login salah password -> 401" POST /auth/login 401 -H 'Content-Type: application/json' -d '{"username":"admin","password":"salah"}'
 ja "  format error standar" '.success == false'
@@ -50,6 +54,28 @@ req "po dengan Bearer -> 200" GET /po 200 -H "Authorization: Bearer $TOKEN"
 ja "  3 baris, hanya id_po/nama_po" '.success == true and (.data | length) == 3 and (.data[0] | keys | sort) == ["id_po","nama_po"]'
 req "tujuan dgn X-ttpg-key hash -> 200" GET /tujuan 200 -H "X-ttpg-key: dev-key-123"
 req "tujuan dgn key salah -> 401" GET /tujuan 401 -H "X-ttpg-key: salah"
+AUTH_BASIC=$(printf 'admin:admin123' | base64 | tr -d '\n')
+AUTH_BASIC_SALAH=$(printf 'admin:salah' | base64 | tr -d '\n')
+req "tujuan dgn Basic auth -> 200" GET /tujuan 200 -H "Authorization: Basic $AUTH_BASIC"
+req "tujuan dgn Basic salah -> 401" GET /tujuan 401 -H "Authorization: Basic $AUTH_BASIC_SALAH"
+req "tujuan dgn Digest auth -> 401 (skema dilepas)" GET /tujuan 401 -H "Authorization: Digest username=\"admin\", realm=\"ttpg\", nonce=\"n1\", uri=\"/tujuan\""
+req "tujuan dgn X-API-Key env -> 200" GET /tujuan 200 -H "X-API-Key: 12345"
+
+echo "===== A2. BOARDING (MONGO) ====="
+req "GET /boarding -> 200" GET /boarding 200 -H "Authorization: Bearer $TOKEN"
+ja "  1 doc + pagination" '.success == true and (.data|length) == 1 and .pagination.total == 1 and .data[0].ticket_id == "T001"'
+req "boarding?destination_id=2 -> 200" GET "/boarding?destination_id=2" 200 -H "Authorization: Bearer $TOKEN"
+ja "  cocok 1" '.success == true and (.data|length) == 1'
+req "boarding?ticket_id=T001 -> 200" GET "/boarding?ticket_id=T001" 200 -H "Authorization: Bearer $TOKEN"
+ja "  1 doc" '.success == true and (.data|length) == 1'
+req "boarding?limit=0 -> 400" GET "/boarding?limit=0" 400 -H "Authorization: Bearer $TOKEN"
+ja "  pesan limit" '.success == false and (.message | contains("limit"))'
+req "boarding?destination_id=abc -> 400" GET "/boarding?destination_id=abc" 400 -H "Authorization: Bearer $TOKEN"
+ja "  pesan destination_id" '.success == false'
+req "boarding tanpa token -> 401" GET /boarding 401
+
+req "GET /docs -> 200 (docs interaktif)" GET /docs 200
+case "$BODY" in *TTPG*) PASS=$((PASS+1)); echo "PASS  docs body contains TTPG";; *) FAIL=$((FAIL+1)); echo "FAIL  docs body: ${BODY:0:150}";; esac
 
 echo "===== B. GATE ====="
 req "gate tanpa key -> 401" POST /gate 401 -H 'Content-Type: application/json' -d '{"noreg":"SCAN001"}'
@@ -68,6 +94,10 @@ req "gate noreg kosong -> 400" POST /gate 400 -H "$KEY" -H 'Content-Type: applic
 
 SCAN_COUNT=$(sqlq "SELECT COUNT(*) FROM terminal_boardingpass WHERE noreg='SCAN001' AND fungsi='gatein' AND count_scan=2 AND gate_id=1")
 if [ "$SCAN_COUNT" = "1" ]; then PASS=$((PASS+1)); echo "PASS  DB: SCAN001 fungsi=gatein count_scan=2"; else FAIL=$((FAIL+1)); echo "FAIL  DB: SCAN001 -> '$SCAN_COUNT'"; fi
+req "gate dgn JWT token -> 200" POST /gate 200 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"noreg":"GATE002","gate_id":1}'
+ja "  VALID RESCAN" '.success == true and .reason == "VALID RESCAN"'
+req "gate dgn Basic auth -> 200" POST /gate 200 -H "Authorization: Basic $AUTH_BASIC" -H 'Content-Type: application/json' -d '{"noreg":"GATE002","gate_id":1}'
+ja "  VALID RESCAN" '.success == true and .reason == "VALID RESCAN"'
 
 echo "===== C. BOARDINGPASS ====="
 BP_ID=$(sqlq "SELECT id FROM terminal_boardingpass WHERE noreg='SCAN001'")
@@ -80,6 +110,7 @@ req "POST /boardingpass noreg tak dikenal -> 404" POST /boardingpass 404 -H "$KE
 
 echo "===== C2. BOARDINGPASS LIST/UPDATE/DELETE ====="
 req "list tanpa key -> 401" GET /boardingpass 401
+req "list dgn key secret_key ttpg_users -> 200" GET /boardingpass 200 -H "X-ttpg-key: dev-key-123"
 req "GET /boardingpass -> 200" GET /boardingpass 200 -H "$KEY"
 ja "  total>=1 + data array" '.total >= 1 and (.data | length) >= 1 and (.data | type) == "array"'
 req "list?noreg=SCAN001 -> 200" GET "/boardingpass?noreg=SCAN001" 200 -H "$KEY"
@@ -124,17 +155,18 @@ req "list?noreg=DEL001 (soft delete) -> 200" GET "/boardingpass?noreg=DEL001" 20
 ja "  tidak muncul di list" '.total == 0'
 
 echo "===== D. PRINT ====="
-req "print by noreg -> 200 HTML" GET /boardingpass/print/SCAN001 200
+req "print by noreg -> 200 HTML" GET /boarding/print/SCAN001 200
 case "$BODY" in *BOARDINGPASS*) PASS=$((PASS+1)); echo "PASS  print body contains BOARDINGPASS";; *) FAIL=$((FAIL+1)); echo "FAIL  print body: ${BODY:0:150}";; esac
 case "$BODY" in *"Budi Santoso"*) PASS=$((PASS+1)); echo "PASS  print contains nama dari DB";; *) FAIL=$((FAIL+1)); echo "FAIL  nama tidak ada di print";; esac
-req "print by ticket_id -> 200" GET /boardingpass/print/TKT-001 200
-req "print tidak dikenal -> 404" GET /boardingpass/print/TIDAK-ADA 404
-req "print via query params -> 200 (tanpa DB)" GET "/boardingpass/print/ANYCODE?nama_pnp=Budi&nama_po=PO1&tujuan=Bekasi&tanggal_berangkat=2026-10-12&jam_berangkat=08:00:00&autoprint=1" 200
+req "print by ticket_id -> 200" GET /boarding/print/TKT-001 200
+req "print tidak dikenal -> 404" GET /boarding/print/TIDAK-ADA 404
+req "print via query params -> 200 (tanpa DB)" GET "/boarding/print/ANYCODE?nama_pnp=Budi&nama_po=PO1&tujuan=Bekasi&tanggal_berangkat=2026-10-12&jam_berangkat=08:00:00&autoprint=1" 200
+req "print alias lama /boardingpass/print -> 200" GET /boardingpass/print/SCAN001 200
 
 echo "===== E. CHECKIN MANDIRI ====="
 req "checkin tanpa key -> 401" POST /checkin-mandiri 401 -H 'Content-Type: application/json' -d '{"ticket_id":"T001"}'
 req "checkin T001 (Mongo) -> 201" POST /checkin-mandiri 201 -H "$KEY" -H 'Content-Type: application/json' -d '{"ticket_id":"T001"}'
-ja "  status/source/noreg CM" '.status == true and .source == "mongodb" and (.noreg | startswith("CM")) and (.print_url | contains("/boardingpass/print/"))'
+ja "  status/source/noreg CM" '.status == true and .source == "mongodb" and (.noreg | startswith("CM")) and (.print_url | contains("/boarding/print/"))'
 CM_NOREG=$(printf '%s' "$BODY" | jq -r .noreg)
 req "checkin T001 ulang -> 200 (sudah checkin)" POST /checkin-mandiri 200 -H "$KEY" -H 'Content-Type: application/json' -d '{"ticket_id":"T001"}'
 ja "  data + print_url" '.status == true and (.data.fungsi | if type=="object" then .String else . end) == "checkin"'
@@ -170,7 +202,7 @@ ja "  0 doc" '(.data | length) == 0'
 req "POST /boarding tanpa nama -> 400" POST /boarding 400 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"ticket_id":"X","destination_id":1,"date_of_departure":"2026-10-15","time_of_departure":"07:00:00"}'
 
 echo "===== G. RESTRIKSI po_id USER ====="
-docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg_auth -e "UPDATE users SET po_ids='PO001' WHERE username='admin'" 2>/dev/null
+docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg_users -e "UPDATE user SET po_id='PO001' WHERE username='admin'" 2>/dev/null
 req "login lagi (po_ids=PO001)" POST /auth/login 200 -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}'
 TOKEN2=$(printf '%s' "$BODY" | jq -r .data.token)
 req "POST /boarding po_id PO002 -> 403" POST /boarding 403 -H "Authorization: Bearer $TOKEN2" -H 'Content-Type: application/json' -d '{"po_id":"PO002","ticket_id":"MB-X","destination_id":1,"date_of_departure":"2026-10-15","time_of_departure":"07:00:00","name":"Uji"}'
@@ -179,7 +211,32 @@ AUTO_PO=$(docker exec -i ttpg-mongo mongosh --quiet ttpg --eval 'db.boarding.fin
 if [ "$AUTO_PO" = "PO001" ]; then PASS=$((PASS+1)); echo "PASS  auto-fill po_id=PO001"; else FAIL=$((FAIL+1)); echo "FAIL  po_id='$AUTO_PO'"; fi
 req "GET /boarding terfilter hanya PO001" GET /boarding 200 -H "Authorization: Bearer $TOKEN2"
 ja "  tidak ada PO002" '([.data[].po_id] | contains(["PO002"])) | not'
-docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg_auth -e "UPDATE users SET po_ids='' WHERE username='admin'" 2>/dev/null
+docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg_users -e "UPDATE user SET po_id='' WHERE username='admin'" 2>/dev/null
+
+echo "===== H. ATURAN ENDPOINT + AKSES ttpg_users ====="
+req "POST /boarding dgn API key -> 403 (rule: wajib Bearer)" POST /boarding 403 -H "X-ttpg-key: dev-key-123" -H 'Content-Type: application/json' -d '{"ticket_id":"X","destination_id":1,"date_of_departure":"2026-10-15","time_of_departure":"07:00:00","name":"Uji"}'
+ja "  pesan skema wajib" '.success == false and (.message | contains("bearer_token"))'
+req "GET /tujuan dgn API key -> 200 (rute tanpa baris api_url)" GET /tujuan 200 -H "X-ttpg-key: dev-key-123"
+
+req "login limited -> 200" POST /auth/login 200 -H 'Content-Type: application/json' -d '{"username":"limited","password":"limited123"}'
+LTOKEN=$(printf '%s' "$BODY" | jq -r .data.token)
+req "POST /boarding limited -> 403 (access.id_api=2, rule=1)" POST /boarding 403 -H "Authorization: Bearer $LTOKEN" -H 'Content-Type: application/json' -d '{"ticket_id":"X","destination_id":1,"date_of_departure":"2026-10-15","time_of_departure":"07:00:00","name":"Uji"}'
+ja "  pesan tidak memiliki akses" '.success == false and (.message | contains("akses"))'
+req "GET /tujuan limited -> 200 (rute tanpa aturan)" GET /tujuan 200 -H "Authorization: Bearer $LTOKEN"
+
+sqlu "UPDATE user SET is_block=1 WHERE username='admin'"
+req "GET /tujuan admin diblokir -> 403" GET /tujuan 403 -H "Authorization: Bearer $TOKEN"
+req "GET /tujuan superkey -> 200 (lewati gate user)" GET /tujuan 200 -H "$KEY"
+sqlu "UPDATE user SET is_block=0 WHERE username='admin'"
+req "GET /tujuan setelah unblock -> 200" GET /tujuan 200 -H "Authorization: Bearer $TOKEN"
+
+sqlu "UPDATE user SET is_block=1 WHERE username='admin'"
+req "login user diblokir -> 401" POST /auth/login 401 -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}'
+sqlu "UPDATE user SET is_block=0 WHERE username='admin'"
+
+sleep 1
+LOGS=$(sqlu "SELECT COUNT(*) FROM logs WHERE uri LIKE '/tujuan%' OR uri LIKE '/boarding%'")
+if [ -n "$LOGS" ] && [ "$LOGS" -gt 0 ] 2>/dev/null; then PASS=$((PASS+1)); echo "PASS  logs ttpg_users tercatat ($LOGS baris)"; else FAIL=$((FAIL+1)); echo "FAIL  logs kosong -> '$LOGS'"; fi
 
 echo ""
 echo "================================"

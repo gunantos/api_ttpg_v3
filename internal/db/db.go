@@ -11,4 +11,5 @@ var (
 	DB           *sql.DB
 	MongoClient  *mongo.Client
 	PenginapanDB *gorm.DB
+	UsersDB      *gorm.DB
 )

@@ -26,6 +26,13 @@ func main() {
 		log.Fatalf("migrate authDB: %v", err)
 	}
 
+	usersDB, err := database.ConnectMySQL(cfg.UsersDSN)
+	if err != nil {
+		log.Fatalf("usersDB: %v", err)
+	}
+	db.UsersDB = usersDB
+	auth.SetUsersDB(usersDB)
+
 	mainDB, err := database.ConnectMySQL(cfg.MainDSN)
 	if err != nil {
 		log.Fatalf("mainDB: %v", err)

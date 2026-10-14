@@ -316,3 +316,23 @@ func DeletePurchaseSource(c *gin.Context) {
 	}
 	response.Success(c, http.StatusOK, "Sumber pembelian berhasil dihapus", nil, nil)
 }
+
+func GetQRISPenginapan(c *gin.Context) {
+	var payloadCfg models.PenginapanConfig
+	if err := db.PenginapanDB.Where("key_configs = ?", "qris_payload").First(&payloadCfg).Error; err != nil ||
+		payloadCfg.ValueConfigs == nil || strings.TrimSpace(*payloadCfg.ValueConfigs) == "" {
+		response.Error(c, http.StatusNotFound, "QRIS belum dikonfigurasi", []response.ErrorItem{{
+			Code:   "NOT_CONFIGURED",
+			Detail: "isi key_configs 'qris_payload' (payload EMV QR / string QRIS statis) via POST /penginapan/configs",
+		}})
+		return
+	}
+
+	data := gin.H{"payload": strings.TrimSpace(*payloadCfg.ValueConfigs)}
+	var merchantCfg models.PenginapanConfig
+	if err := db.PenginapanDB.Where("key_configs = ?", "qris_merchant").First(&merchantCfg).Error; err == nil &&
+		merchantCfg.ValueConfigs != nil {
+		data["merchant"] = strings.TrimSpace(*merchantCfg.ValueConfigs)
+	}
+	response.Success(c, http.StatusOK, "Konfigurasi QRIS ditemukan", data, nil)
+}

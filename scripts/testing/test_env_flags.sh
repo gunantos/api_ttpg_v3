@@ -1,5 +1,5 @@
 #!/bin/bash
-BASE=http://127.0.0.1:8090
+BASE=http://127.0.0.1:3080
 KEY="X-ttpg-key: 12345"
 BIN=${TTPG_BIN:-/tmp/opencode/ttpg_server}
 if [ ! -x "$BIN" ]; then mkdir -p "$(dirname "$BIN")" && (cd "$(dirname "$0")/../.." && go build -o "$BIN" .); fi
@@ -8,7 +8,7 @@ PASS=0; FAIL=0
 restart() { # env assignment string
   pkill -f 'ttpg_server' 2>/dev/null; sleep 1
   for i in $(seq 1 10); do pgrep -f 'ttpg_server' >/dev/null || break; sleep 0.3; done
-  ( cd /tmp/opencode && setsid env PORT=8090 "$@" AUTH_DSN='api2:andtho1989@tcp(127.0.0.1:13306)/ttpg_auth?parseTime=true' MAIN_DSN='api2:andtho1989@tcp(127.0.0.1:13306)/ttpg?parseTime=true' PENGINAPAN_DSN='api2:andtho1989@tcp(127.0.0.1:13306)/ttpg_penginapan?parseTime=true' MONGO_URI='mongodb://127.0.0.1:27017' "$BIN" > /tmp/opencode/ttpg_server.log 2>&1 < /dev/null & )
+  ( cd /tmp/opencode && setsid env PORT=3080 "$@" AUTH_DSN='api2:andtho1989@tcp(127.0.0.1:13306)/ttpg_auth?parseTime=true' MAIN_DSN='api2:andtho1989@tcp(127.0.0.1:13306)/ttpg?parseTime=true' PENGINAPAN_DSN='api2:andtho1989@tcp(127.0.0.1:13306)/ttpg_penginapan?parseTime=true' USERS_DSN='api2:andtho1989@tcp(127.0.0.1:13306)/ttpg_users?parseTime=true' MONGO_URI='mongodb://127.0.0.1:27017' "$BIN" > /tmp/opencode/ttpg_server.log 2>&1 < /dev/null & )
   for i in $(seq 1 20); do
     curl -s -m 2 -o /dev/null "$BASE/auth/key" && return 0
     sleep 0.5

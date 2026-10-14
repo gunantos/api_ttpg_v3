@@ -7,25 +7,28 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andtho89/ttpg/internal/config"
+	"github.com/andtho89/ttpg/internal/docs"
 	"github.com/andtho89/ttpg/internal/handler"
-	"github.com/andtho89/ttpg/internal/middleware"
 	"github.com/andtho89/ttpg/internal/models"
 	"github.com/andtho89/ttpg/internal/pkg/response"
 	"github.com/andtho89/ttpg/internal/platform/auth"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"gorm.io/gorm"
 )
 
 func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 	boardingCol := mongoClient.Database("ttpg").Collection("boarding")
 
+	r.GET("/boarding/print/:code", handler.PrintBoardingpass)
 	r.GET("/boardingpass/print/:code", handler.PrintBoardingpass)
 	r.GET("/ws", handler.HandleWS)
+	r.GET("/docs", docs.Serve)
+	r.GET("/penginapan/payments/:id/receipt", handler.PaymentReceipt)
 
-	apiKeyAuth := r.Group("", middleware.ApiKeyAuth(config.C.APIKey))
+	apiKeyAuth := r.Group("", auth.AuthMiddleware())
 	apiKeyAuth.POST("/gate", handler.Gate)
 	apiKeyAuth.POST("/checkin-mandiri", handler.CheckinMandiri)
 	apiKeyAuth.GET("/boardingpass", handler.List)
@@ -51,11 +54,12 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 			return
 		}
 
-		token, _ := auth.GenerateToken(u.ID, u.Role, auth.ParsePOIDs(u.POIDs))
+		role := auth.RoleFromUser(u)
+		token, _ := auth.GenerateToken(u.ID, role, auth.ParsePOIDs(u.PoIDOrEmpty()))
 		response.Success(c, http.StatusOK, "Login berhasil", gin.H{
 			"token":   token,
 			"user_id": u.ID,
-			"role":    u.Role,
+			"role":    role,
 			"expire":  time.Now().Add(auth.TokenExpiry).Format(time.RFC3339),
 		}, nil)
 	})
@@ -98,22 +102,58 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 			filter["ticket_id"] = v
 		}
 		if v := c.Query("destination_id"); v != "" {
-			if n, err := strconv.Atoi(v); err == nil {
-				filter["destination_id"] = n
+			n, err := strconv.Atoi(v)
+			if err != nil {
+				response.Error(c, http.StatusBadRequest, "destination_id tidak valid", []response.ErrorItem{{Field: "destination_id", Code: "VALIDATION_ERROR", Detail: err.Error()}})
+				return
+			}
+			filter["$or"] = []bson.M{
+				{"destination_id": n},
+				{"destination_id": strconv.Itoa(n)},
+				{"destination_id.id_tujuan": n},
 			}
 		}
-		cur, err := boardingCol.Find(context.TODO(), filter)
+		limit := 100
+		if v := strings.TrimSpace(c.Query("limit")); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 || n > 1000 {
+				response.Error(c, http.StatusBadRequest, "limit harus 1-1000", []response.ErrorItem{{Field: "limit", Code: "VALIDATION_ERROR", Detail: "limit harus 1-1000"}})
+				return
+			}
+			limit = n
+		}
+		offset := 0
+		if v := strings.TrimSpace(c.Query("offset")); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 0 {
+				response.Error(c, http.StatusBadRequest, "offset tidak valid", []response.ErrorItem{{Field: "offset", Code: "VALIDATION_ERROR", Detail: "offset tidak valid"}})
+				return
+			}
+			offset = n
+		}
+		total, err := boardingCol.CountDocuments(context.TODO(), filter)
+		if err != nil {
+			response.Error(c, http.StatusInternalServerError, "Gagal menghitung data boarding", []response.ErrorItem{{Code: "DB_ERROR", Detail: err.Error()}})
+			return
+		}
+		cur, err := boardingCol.Find(context.TODO(), filter, options.Find().SetSkip(int64(offset)).SetLimit(int64(limit)))
 		if err != nil {
 			response.Error(c, http.StatusInternalServerError, "Gagal mengambil data boarding", []response.ErrorItem{{Code: "DB_ERROR", Detail: err.Error()}})
 			return
 		}
 		defer cur.Close(context.TODO())
-		var data []models.BoardingDoc
+		data := []models.BoardingDoc{}
 		if err := cur.All(context.TODO(), &data); err != nil {
 			response.Error(c, http.StatusInternalServerError, "Gagal decode data", []response.ErrorItem{{Code: "DECODE_ERROR", Detail: err.Error()}})
 			return
 		}
-		response.Success(c, http.StatusOK, "Data boarding ditemukan", data, nil)
+		pagination := &response.Pagination{
+			Page:       offset/limit + 1,
+			Limit:      limit,
+			Total:      int(total),
+			TotalPages: (int(total) + limit - 1) / limit,
+		}
+		response.Success(c, http.StatusOK, "Data boarding ditemukan", data, pagination)
 	})
 
 	api.POST("/boarding", func(c *gin.Context) {
@@ -181,7 +221,7 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 			TimeOfDeparture: req.TimeOfDeparture,
 			Nopol:           req.Nopol,
 			POID:            req.POID,
-			DestinationID:   req.DestinationID,
+			DestinationID:   models.FlexInt(req.DestinationID),
 			PNP:             pnp,
 			UserID:          c.MustGet("user_id").(uint),
 			Status:          "active",
@@ -303,6 +343,8 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 	peng.POST("/configs", handler.CreateConfig)
 	peng.PUT("/configs/:id", handler.UpdateConfig)
 	peng.DELETE("/configs/:id", handler.DeleteConfig)
+
+	peng.GET("/qris", handler.GetQRISPenginapan)
 
 	peng.GET("/payment-methods", handler.ListPaymentMethods)
 	peng.POST("/payment-methods", handler.CreatePaymentMethod)

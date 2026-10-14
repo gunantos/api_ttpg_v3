@@ -1,5 +1,5 @@
 #!/bin/bash
-BASE=${BASE:-http://127.0.0.1:8090}
+BASE=${BASE:-http://127.0.0.1:3080}
 WSHOST=$(printf '%s' "$BASE" | sed 's|^http|ws|')
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 CLIENT=/tmp/opencode/ws_client

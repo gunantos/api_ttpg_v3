@@ -1,10 +1,12 @@
 # Dokumentasi API — TTPG
 
-Base URL (default): `http://localhost:8080`
+Base URL (default): `http://localhost:3080`
 
-> Server listen di `0.0.0.0` — dari komputer lain di LAN yang sama, ganti `localhost` dengan IP server, mis. `http://192.168.1.50:8080` (lihat README → "Akses dari Komputer Lain" untuk buka firewall).
+> Server listen di `0.0.0.0` — dari komputer lain di LAN yang sama, ganti `localhost` dengan IP server, mis. `http://192.168.1.50:3080` (lihat README → "Akses dari Komputer Lain" untuk buka firewall).
 
 Sumber kebenaran route: `internal/routes/routes.go`. **Update file ini setiap ada perubahan endpoint.**
+
+> **Halaman docs interaktif**: server menyajikan dokumentasi HTML (parameter, body, contoh respons, snippet cURL/PHP/Python/Node.js/Go, tombol "Coba") di **`GET /docs`** — source: `internal/docs/api.html` (di-embed via `internal/docs/docs.go`). File markdown ini tetap sumber ringkas.
 
 ---
 
@@ -12,23 +14,26 @@ Sumber kebenaran route: `internal/routes/routes.go`. **Update file ini setiap ad
 
 | Method | Path | Auth |
 |--------|------|------|
-| GET | `/boardingpass/print/:code` | Tanpa auth (public) |
+| GET | `/boarding/print/:code` | Tanpa auth (public) |
+| GET | `/boardingpass/print/:code` | Tanpa auth (public, alias lama dari `/boarding/print/:code`) |
+| GET | `/penginapan/payments/:id/receipt` | Tanpa auth (public) — HTML struk pembayaran 78mm, `?autoprint=1` |
 | GET | `/ws` | JWT via query `?token=` (public route, auth di handler) |
-| POST | `/gate` | API key literal |
-| POST | `/checkin-mandiri` | API key literal |
-| GET | `/boardingpass` | API key literal |
-| GET | `/boardingpass/:id` | API key literal |
-| POST | `/boardingpass` | API key literal |
-| PUT | `/boardingpass/:id` | API key literal |
-| DELETE | `/boardingpass/:id` | API key literal |
+| GET | `/docs` | Tanpa auth (public) — halaman dokumentasi interaktif (HTML, contoh kode cURL/PHP/Python/Node/Go) |
+| POST | `/gate` | Seragam† |
+| POST | `/checkin-mandiri` | Seragam† |
+| GET | `/boardingpass` | Seragam† |
+| GET | `/boardingpass/:id` | Seragam† |
+| POST | `/boardingpass` | Seragam† |
+| PUT | `/boardingpass/:id` | Seragam† |
+| DELETE | `/boardingpass/:id` | Seragam† |
 | POST | `/auth/login` | Tanpa auth |
-| GET | `/auth/key` | Basic atau Digest |
-| GET | `/tujuan` | JWT atau API key ter-hash |
-| GET | `/po` | JWT atau API key ter-hash |
-| GET | `/boarding` | JWT atau API key ter-hash |
-| POST | `/boarding` | JWT atau API key ter-hash |
-| PUT | `/boarding/:id` | JWT atau API key ter-hash |
-| DELETE | `/boarding/:id` | JWT atau API key ter-hash |
+| GET | `/auth/key` | Basic |
+| GET | `/tujuan` | Seragam† |
+| GET | `/po` | Seragam† |
+| GET | `/boarding` | Seragam† |
+| POST | `/boarding` | Seragam† |
+| PUT | `/boarding/:id` | Seragam† |
+| DELETE | `/boarding/:id` | Seragam† |
 | GET/POST | `/penginapan/configs`, `/penginapan/configs/key/:key` | JWT (AuthMiddleware) |
 | PUT/DELETE | `/penginapan/configs/:id` | JWT (AuthMiddleware) |
 | GET/POST/PUT/DELETE | `/penginapan/payment-methods[/:id]` | JWT (AuthMiddleware) |
@@ -40,58 +45,48 @@ Sumber kebenaran route: `internal/routes/routes.go`. **Update file ini setiap ad
 | POST | `/penginapan/guests/:id/checkout`, `/penginapan/guests/:id/pindah` | JWT (AuthMiddleware) |
 | GET | `/penginapan/guests/:id/histories` | JWT (AuthMiddleware) |
 | GET/POST/PUT/DELETE | `/penginapan/payments[/:id]` | JWT (AuthMiddleware) |
+| GET | `/penginapan/qris` | JWT (AuthMiddleware) |
 | GET | `/penginapan/room-histories` | JWT (AuthMiddleware) |
 
-Total 41 endpoint penginapan di group `/penginapan` (detail dan body request di bagian [Penginapan](#penginapan)).
+Total 43 endpoint penginapan: 42 di group `/penginapan` + 1 public (`GET /penginapan/payments/:id/receipt`) — detail dan body request di bagian [Penginapan](#penginapan).
 
 ---
 
 ## Autentikasi
 
-### 1. API key literal (group gate / checkin / boardingpass)
+† **Seragam** — semua route protected (gate, checkin-mandiri, boardingpass, tujuan, po, boarding, penginapan) memakai satu middleware `auth.AuthMiddleware` yang menerima salah satu skema:
 
-Header:
+| Skema | Header | Catatan |
+|-------|--------|---------|
+| API key (DB `ttpg_users`) | `X-ttpg-key: dev-key-123` atau `X-API-Key: …` | cocok `user.secret_key` (user aktif; user_id/role/po_ids dari baris `user` tersebut) |
+| API key literal | `X-ttpg-key: 12345` atau `X-API-Key: 12345` | cocok literal dengan env `API_KEY` (default `12345`) — berlaku sebagai superkey; konteks `user_id=0`, `role=api_key` |
+| JWT | `Authorization: Bearer <token>` | token dari `/auth/login`, berlaku 1 minggu |
+| Basic | `Authorization: Basic base64(username:password)` | user aktif di `ttpg_users.user` (bcrypt PHP `$2y$` kompatibel) |
 
-```
-X-ttpg-key: 12345
-# atau
-X-API-Key: 12345
-```
+Digest **dilepas** (tabel `user` di `ttpg_users` tidak punya kolom HA1); skema tak dikenal → `401`.
 
-Nilai dibandingkan **literal** dengan env `API_KEY` (default `12345`). Jika tidak cocok:
-
-```json
-HTTP 401
-{"status": false, "message": "api key tidak valid"}
-```
-
-### 2. JWT / API key ter-hash (group tujuan, po, boarding)
-
-Opsi A — JWT (berlaku 1 minggu, didapat dari `/auth/login`):
-
-```
-Authorization: Bearer <token>
-```
-
-Opsi B — API key dari tabel `api_keys` (di-hash SHA-256):
-
-```
-X-ttpg-key: dev-key-123
-```
-
-Gagal:
+Urutan validasi: header API key (literal env `API_KEY` dulu, baru `user.secret_key`) → `Authorization` (`Bearer` / `Basic`). Gagal atau skema tidak dikenal → `401` + header `WWW-Authenticate: Basic realm="ttpg"`:
 
 ```json
 HTTP 401
 {"success": false, "message": "…"}
 ```
 
-> Catatan: header `X-ttpg-key` dipakai dua kali dengan makna berbeda — literal `API_KEY` di group gate/checkin, dan ter-hash ke `api_keys` di group tujuan/po/boarding.
+> Catatan: `X-ttpg-key` tetap punya dua makna dalam satu middleware — literal env `API_KEY` (superkey, `user_id=0`) dicek lebih dulu, baru `user.secret_key` di `ttpg_users`.
 
-### 3. Basic / Digest (`GET /auth/key`)
+### Aturan endpoint (DB `ttpg_users`)
 
-- Basic: `Authorization: Basic base64(username:password)`
-- Digest: `Authorization: Digest …` (realm `ttpg`, `DigestHA1` user)
+Setelah identitas valid, middleware mengecek baris `api_url` yang cocok **method + path** (kolom `controller` ternormalisasi: huruf kecil, tanpa trailing `/`, `/x/index` == `/x`; dibandingkan juga dengan pola route Gin, mis. `/penginapan/rooms/:id`):
+
+- `authorization` = skema wajib (`api_key` / `bearer_token` / `basic_auth` / `none`) → salah skema → **403**;
+- izin akses (dilewati bila `user.all_access='y'` atau superkey env `API_KEY`): gabungan `user.allowed` + `access.id_api` (dipisah `;` **atau** `,`) wajib memuat id baris `api_url`, dan `access.block='n'` + `access.allow='y'` → salah → **403**;
+- `user.is_block=1` / `is_approved=0` → **403** (login/key ditolak **401**).
+
+Rute **tanpa** baris `api_url` menerima skema apa pun (aturan hanya berlaku bila baris ada — keputusan: ketat saat ada, bebas saat tidak ada).
+
+Setiap request (termasuk yang gagal) dicatat **async** ke `ttpg_users.logs`: `uri`, `method`, `params` (query string), `api_key`, `ip_address`, `time`, `rtime`, `authorized` (`y`/`n`), `response_code`, `id_user`, `po_id`, `access_by` (skema), `date`.
+
+Endpoint **public** (tanpa auth): `/auth/login`, `/auth/key` (menjalankan Basic-nya sendiri), `/boarding/print/:code` (+alias), `/penginapan/payments/:id/receipt`, `/ws` (JWT via query `?token=`), `/docs`.
 
 ---
 
@@ -243,7 +238,7 @@ Alur: cari di Mongo `boarding` (`status=active`, `user_id` tidak di `IgnoredMong
   "nopol": "B 1234 …", "tanggal_berangkat": "2026-10-12",
   "jam_berangkat": "08:00:00", "nama_pnp": "…", "sex_pnp": "L",
   "fungsi": "gatein", "id_user": "…", "pembelian_dari": "…",
-  "nama_po": "…", "tujuan": "…", "print_url": "http://…/boardingpass/print/CM…?…"
+  "nama_po": "…", "tujuan": "…", "print_url": "http://…/boarding/print/CM…?…"
 }
 ```
 
@@ -344,9 +339,9 @@ Header: API key literal. Soft delete (`deleted = NOW()`, baris tetap ada tapi di
 - `404` `{"error": "boardingpass tidak ditemukan"}` (tidak ada atau sudah terhapus)
 - `400` id tidak valid
 
-### GET `/boardingpass/print/:code`
+### GET `/boarding/print/:code`
 
-**Public (tanpa auth).** Response `200` = HTML siap cetak (ukuran 78mm, QR dari `qrcodejs`).
+**Public (tanpa auth).** Response `200` = HTML siap cetak (ukuran 78mm, QR dari `qrcodejs`). URL lama `GET /boardingpass/print/:code` tetap berfungsi sebagai alias.
 
 `:code` = `noreg` **atau** `ticket_id` (lookup `terminal_boardingpass` WHERE deleted IS NULL).
 
@@ -370,7 +365,7 @@ Error: `400` kode kosong, `404` boardingpass tidak ditemukan, `500` `{"status": 
 
 ### GET `/tujuan`
 
-Auth: JWT / API key ter-hash. Format standar, `data` = array `tbl_tujuan` semua kolom, urut `id_tujuan`.
+Auth seragam (JWT / Basic / API key — lihat [Autentikasi](#autentikasi)). Format standar, `data` = array `tbl_tujuan` semua kolom, urut `id_tujuan`.
 
 ```json
 { "success": true, "message": "Data tujuan ditemukan", "data": [ … ] }
@@ -378,7 +373,7 @@ Auth: JWT / API key ter-hash. Format standar, `data` = array `tbl_tujuan` semua 
 
 ### GET `/po`
 
-Auth: JWT / API key ter-hash. Hanya `id_po` dan `nama_po`, urut `id_po`.
+Auth seragam (JWT / Basic / API key — lihat [Autentikasi](#autentikasi)). Hanya `id_po` dan `nama_po`, urut `id_po`.
 
 ```json
 { "success": true, "message": "Data po ditemukan",
@@ -389,7 +384,7 @@ Auth: JWT / API key ter-hash. Hanya `id_po` dan `nama_po`, urut `id_po`.
 
 ## Boarding (MongoDB)
 
-Auth: JWT / API key ter-hash. Koleksi `boarding` (db `ttpg`).
+Auth seragam (JWT / Basic / API key — lihat [Autentikasi](#autentikasi)). Koleksi `boarding` (db `ttpg`).
 
 Aturan `po_id` user: `users.po_ids` disimpan sebagai string dipisah koma → di-parse `[]string`.
 
@@ -399,10 +394,19 @@ Aturan `po_id` user: `users.po_ids` disimpan sebagai string dipisah koma → di-
 
 ### GET `/boarding`
 
-Query: `po_id`, `ticket_id`, `destination_id` (opsional, disaring ke `po_id` user).
+Query: `po_id`, `ticket_id`, `destination_id` (opsional, disaring ke `po_id` user), `limit` (1-1000, default 100), `offset` (default 0).
+
+`destination_id` menerima nilai numerik; dokumen lama dengan nilai string (`"395"`) atau object (`{id_tujuan: 395, …}`) ikut cocok. `destination_id` non-numerik → `400`. `limit` di luar 1-1000 atau `offset` negatif → `400`.
+
+Respons (paginasi menyertai `data`):
 
 ```json
-{ "success": true, "message": "Data boarding ditemukan", "data": [ … ] }
+{
+  "success": true,
+  "message": "Data boarding ditemukan",
+  "data": [ … ],
+  "pagination": { "page": 1, "limit": 100, "total": 1235253, "total_pages": 12353 }
+}
 ```
 
 ### POST `/boarding`
@@ -448,7 +452,7 @@ Error: `400` validasi, `403` po_id tidak diizinkan, `500` DB.
 
 ## Penginapan
 
-Auth: JWT (`AuthMiddleware`) untuk **semua** route `/penginapan/*`. Format response: **standar A** (`success/message/data`). Database khusus `ttpg_penginapan` (env `PENGINAPAN_DSN`), GORM dengan AutoMigrate; skema canonical: `migrations/mysql/002_create_ttpg_penginapan.sql` (baru) atau `migrations/mysql/003_upgrade_penginapan_v2.sql` (upgrade skema lama produksi, tanpa DROP data).
+Auth seragam (`auth.AuthMiddleware`: JWT / Basic / API key) untuk route `/penginapan/*` — **kecuali** `GET /penginapan/payments/:id/receipt` (public, seperti `/boarding/print` karena dibuka via `window.open` tanpa header). Format response: **standar A** (`success/message/data`). Database khusus `ttpg_penginapan` (env `PENGINAPAN_DSN`), GORM dengan AutoMigrate; skema canonical: `migrations/mysql/002_create_ttpg_penginapan.sql` (baru) atau `migrations/mysql/003_upgrade_penginapan_v2.sql` (upgrade skema lama produksi, tanpa DROP data).
 
 Aturan bisnis:
 
@@ -550,6 +554,27 @@ Error: `400` validasi/alokasi, `404` room tidak ada, `409` kapasitas penuh / mai
 
 `DELETE /penginapan/payments/:id` — void (status `batal`); alokasi tidak lagi dihitung lunas. `409` bila sudah `batal`.
 
+### Struk & QRIS
+
+`GET /penginapan/payments/:id/receipt` — **public** (tanpa auth), mengembalikan HTML struk pembayaran 78mm siap cetak. Isi: nama hotel (config `nama_hotel`, fallback `PENGINAPAN`), nomor & status payment, metode/sumber/catatan, baris per tamu dari alokasi (nama, kamar, jumlah) + `TOTAL`; status `batal` diberi cap `DIBATALKAN`. Query `?autoprint=1` → `window.print()` otomatis saat load (pola sama seperti `/boarding/print`). `404` bila payment tidak ada.
+
+`GET /penginapan/qris` — payload QRIS untuk ditampilkan ke tamu. Diambil dari config key `qris_payload` (string EMV QR statis / URL gambar QRIS); config opsional `qris_merchant` disertakan bila ada. `404` `NOT_CONFIGURED` bila `qris_payload` belum diisi.
+
+```json
+{ "success": true, "message": "Konfigurasi QRIS ditemukan",
+  "data": { "payload": "00020101021126610014COM.GO-JEK.WWW0…", "merchant": "Nama Merchant" } }
+```
+
+### Alur sekali jalan (front-desk)
+
+Check-in + pembayaran + struk/QRIS dapat diselesaikan dengan sedikit request:
+
+1. `GET /penginapan/rooms?status=kosong` — pilih kamar; `GET /penginapan/payment-methods` — pilih metode.
+2. Satu request: `POST /penginapan/guests` dengan `guests[]` (nama, nik, gender, harga, room_id) + `payment` (`amount`, `payment_method_id`, `source_id`, opsional `status`/`allocations`). Respons memuat `data.payment.id` dan `data.payment.payment_method.code`.
+3. Cabut sesuai metode:
+   - **cash** (`code=cash`, default `status=lunas`) → buka `GET /penginapan/payments/{id}/receipt?autoprint=1` → selesai.
+   - **qris** → `GET /penginapan/qris`, tampilkan QR ke tamu (render payload di frontend), check-in dengan `payment.status="pending"`; setelah lunas → `PUT /penginapan/payments/{id}` `{"status":"lunas"}` → buka struk.
+
 ### Room histories
 
 `GET /penginapan/room-histories` — filter `room_id`, `guest_id`, `status`.
@@ -579,7 +604,7 @@ Event dikirim dari: `POST/PUT/DELETE /penginapan/rooms` (create/update/delete), 
 Contoh koneksi (test client resmi di `scripts/testing/wsclient`):
 
 ```bash
-go run ./scripts/testing/wsclient "ws://127.0.0.1:8090/ws?token=$TOKEN" 15s
+go run ./scripts/testing/wsclient "ws://127.0.0.1:3080/ws?token=$TOKEN" 15s
 # CONNECTED
 # EVENT type=room data={"action":"status","room":{...}}
 ```

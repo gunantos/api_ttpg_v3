@@ -48,9 +48,9 @@ func (PenginapanLocation) TableName() string { return "locations" }
 
 type PenginapanRoom struct {
 	ID               int                 `gorm:"primaryKey;column:id;type:int(11);autoIncrement" json:"id"`
-	LocationID       *int                `gorm:"column:location_id;type:int(11);index" json:"location_id"`
+	LocationID       *int                `gorm:"column:location_id;type:int(11);index;uniqueIndex:uq_rooms_loc_number" json:"location_id"`
 	Location         *PenginapanLocation `gorm:"foreignKey:LocationID" json:"location,omitempty"`
-	RoomNumber       string              `gorm:"column:room_number;size:100;not null;uniqueIndex:idx_rooms_loc_number" json:"room_number"`
+	RoomNumber       string              `gorm:"column:room_number;size:100;not null;uniqueIndex:uq_rooms_loc_number" json:"room_number"`
 	RoomType         string              `gorm:"column:room_type;type:enum('pria','wanita');not null" json:"room_type"`
 	Capacity         int                 `gorm:"column:capacity;type:int(11);not null;default:1" json:"capacity"`
 	CurrentOccupants int                 `gorm:"column:current_occupants;type:int(11);not null;default:0" json:"current_occupants"`

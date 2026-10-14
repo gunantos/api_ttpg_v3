@@ -17,6 +17,7 @@ import (
 	"github.com/andtho89/ttpg/internal/config"
 	"github.com/andtho89/ttpg/internal/db"
 	"github.com/andtho89/ttpg/internal/logger"
+	"github.com/andtho89/ttpg/internal/models"
 	"github.com/andtho89/ttpg/internal/request"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -30,13 +31,13 @@ var (
 )
 
 type mongoBoarding struct {
-	BoardingID      int64  `bson:"boarding_id"`
-	TicketID        string `bson:"ticket_id"`
-	DateOfDeparture string `bson:"date_of_departure"`
-	TimeOfDeparture string `bson:"time_of_departure"`
-	Nopol           string `bson:"nopol"`
-	POID            string `bson:"po_id"`
-	DestinationID   *int   `bson:"destination_id"`
+	BoardingID      int64          `bson:"boarding_id"`
+	TicketID        string         `bson:"ticket_id"`
+	DateOfDeparture string         `bson:"date_of_departure"`
+	TimeOfDeparture string         `bson:"time_of_departure"`
+	Nopol           string         `bson:"nopol"`
+	POID            string         `bson:"po_id"`
+	DestinationID   models.FlexInt `bson:"destination_id"`
 	Destination     struct {
 		Tujuan string `bson:"tujuan"`
 	} `bson:"destination"`
@@ -340,7 +341,7 @@ func buildPrintURL(c *gin.Context, noreg string, boarding *checkinBoardingData) 
 	values.Set("jam_berangkat", boarding.TimeOfDeparture)
 	values.Set("autoprint", "1")
 
-	return requestBaseURL(c) + "/boardingpass/print/" + url.PathEscape(noreg) + "?" + values.Encode()
+	return requestBaseURL(c) + "/boarding/print/" + url.PathEscape(noreg) + "?" + values.Encode()
 }
 
 func buildExistingPrintURL(c *gin.Context, boarding *terminalBoardingpassResponse) string {
@@ -353,7 +354,7 @@ func buildExistingPrintURL(c *gin.Context, boarding *terminalBoardingpassRespons
 	values.Set("jam_berangkat", boarding.JamBerangkat)
 	values.Set("autoprint", "1")
 
-	return requestBaseURL(c) + "/boardingpass/print/" + url.PathEscape(boarding.Noreg) + "?" + values.Encode()
+	return requestBaseURL(c) + "/boarding/print/" + url.PathEscape(boarding.Noreg) + "?" + values.Encode()
 }
 
 func requestBaseURL(c *gin.Context) string {
@@ -489,6 +490,12 @@ func mongoBoardingToCheckinData(boarding mongoBoarding) *checkinBoardingData {
 		userID = &value
 	}
 
+	var destinationID *int
+	if boarding.DestinationID != 0 {
+		value := int(boarding.DestinationID)
+		destinationID = &value
+	}
+
 	return &checkinBoardingData{
 		TicketID:        boarding.TicketID,
 		DateOfDeparture: boarding.DateOfDeparture,
@@ -496,7 +503,7 @@ func mongoBoardingToCheckinData(boarding mongoBoarding) *checkinBoardingData {
 		Nopol:           boarding.Nopol,
 		POID:            boarding.POID,
 		NamaPO:          mongoNamaPO(boarding),
-		DestinationID:   boarding.DestinationID,
+		DestinationID:   destinationID,
 		Tujuan:          mongoTujuan(boarding),
 		PassengerName:   passengerName,
 		PassengerGender: passengerGender,

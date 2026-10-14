@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TTPG API — Dokumentasi</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#ffffff; --panel2:#f8faff; --line:#e2e8f4;
+    --text:#0f2244; --muted:#3e5180; --accent:#2563eb;
+    --navy:#0d2b63; --navy2:#0a1f4a; --navytext:#e8eefc; --navymuted:#93a9d8;
+    --get:#16a34a; --post:#f59e0b; --put:#0ea5e9; --del:#e11d48;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:#bcc7dd transparent}
+  html{scroll-behavior:smooth}
+  html,body{background:#ffffff}
+  body{margin:0;font-family:var(--sans);background:#ffffff;color:var(--text);font-size:14.5px;line-height:1.55}
+  a{color:var(--accent);text-decoration:none}
+  code,pre{font-family:var(--mono)}
+  main code{background:#eef2fb;color:#274ea8;padding:1px 5px;border-radius:5px}
+  pre code{background:none;color:inherit;padding:0}
+
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:#bcc7dd;border-radius:99px}
+  ::-webkit-scrollbar-thumb:hover{background:#96a4c6}
+  aside ::-webkit-scrollbar-thumb{background:#27437c}
+  aside ::-webkit-scrollbar-thumb:hover{background:#3a5da8}
+
+  .layout{display:flex;min-height:100vh}
+
+  /* ---------- sidebar biru tua ---------- */
+  aside{position:sticky;top:0;height:100vh;width:300px;flex:0 0 300px;
+    background-color:#0d2b63;background-image:linear-gradient(180deg,#123a86 0%,#0a1f4a 100%);
+    border-right:1px solid #081838;display:flex;flex-direction:column;z-index:5;color:var(--navytext)}
+  .brand{padding:14px 14px 10px;margin:10px 10px 4px;background:#0b2455;border:1px solid #1c3f8a;border-radius:12px}
+  .brand h1{margin:0;font-size:18px;letter-spacing:.3px;color:#fff}
+  .brand h1 span{background:linear-gradient(90deg,#9db8ff,#48d6c4);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand p{margin:4px 0 0;color:var(--navymuted);font-size:12px}
+  .searchwrap{padding:4px 14px 12px}
+  .searchwrap input{width:100%;padding:9px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.14);
+    background:rgba(0,0,0,.25);color:#fff;outline:none;font-size:13px}
+  .searchwrap input::placeholder{color:#8ba3d6}
+  .searchwrap input:focus{border-color:#5b8cff;box-shadow:0 0 0 3px rgba(91,140,255,.25)}
+  nav{overflow:auto;padding:0 8px 24px;flex:1}
+  .group-title{margin:14px 6px 6px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#dce8ff;
+    background:#0b2455;border:1px solid #1c3f8a;border-radius:7px;padding:4px 9px}
+  nav a.ep{display:flex;gap:8px;align-items:center;padding:6px 9px;border-radius:8px;font-size:13px;font-weight:500;
+    color:#0f2b63;background:#eef4ff;border:1px solid #d5e2ff;margin:2px 6px}
+  nav a.ep:hover{background:#ffffff;border-color:#a9c4ff;box-shadow:0 1px 2px rgba(6,20,60,.25)}
+  nav a.ep.active{background:#ffffff;border-color:#5b8cff;box-shadow:0 0 0 2px rgba(91,140,255,.35)}
+  .m{font-family:var(--mono);font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;color:#0a1226;min-width:54px;text-align:center;flex:0 0 auto}
+  .m.GET{background:var(--get)} .m.POST{background:var(--post)} .m.PUT{background:var(--put)} .m.DELETE{background:var(--del)}
+  .m.WS{background:#a78bfa} .m.DOCS{background:#94a3b8}
+  aside footer{padding:10px 16px;border-top:1px solid rgba(255,255,255,.12);color:var(--navymuted);font-size:11px}
+  aside footer code{color:#b9cbf5;background:none;padding:0}
+
+  /* ---------- konten terang ---------- */
+  main{flex:1;min-width:0;width:100%;max-width:none;padding:26px 34px 80px}
+  .hero{margin-bottom:24px}
+  .hero h2{margin:0 0 6px;font-size:26px;color:#0b1f52}
+  .hero p{color:var(--muted);margin:0 0 14px;max-width:78ch}
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:14px;align-items:center;box-shadow:0 1px 3px rgba(15,35,80,.06)}
+  .toolbar label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px;letter-spacing:.05em;text-transform:uppercase}
+  .toolbar .f{flex:1 1 220px}
+  .toolbar input,.toolbar select{width:100%;padding:8px 10px;border-radius:9px;border:1px solid var(--line);
+    background:#fff;color:var(--text);outline:none}
+  .toolbar input:focus,.toolbar select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  .toolbar .langs{display:flex;gap:6px;flex-wrap:wrap}
+  .toolbar .langs button{padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:#f1f5fd;color:var(--muted);cursor:pointer;font-size:12.5px}
+  .toolbar .langs button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .hint{color:var(--muted);font-size:12px;margin:10px 2px 0}
+
+  section.guide{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:18px 0;box-shadow:0 1px 3px rgba(15,35,80,.05)}
+  section.guide h3{margin:0 0 8px;font-size:16px;color:#0f2557}
+  section.guide table{width:100%;border-collapse:collapse;margin-top:8px}
+  section.guide th,section.guide td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
+  section.guide th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+  pre{margin:0;background:#0b1220;border:1px solid #1d2b47;border-radius:12px;padding:14px 16px;overflow:auto;font-size:12.5px;line-height:1.5;color:#d7e3ff}
+
+  /* ---------- kartu endpoint: 2 kolom (kode di kanan) ---------- */
+  .ep{background:var(--panel);border:1px solid var(--line);border-radius:16px;margin:22px 0;
+    box-shadow:0 1px 3px rgba(15,35,80,.07)}
+  .ep-head{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 18px;
+    border-bottom:1px solid var(--line);background:var(--panel2);border-radius:15px 15px 0 0}
+  .ep-head .path{font-family:var(--mono);font-size:14.5px;font-weight:600;color:#0f2557}
+  .badge{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:#fff}
+  .badge.b-jwt{color:#2563eb;border-color:#c7d7fd;background:#eff4ff}
+  .badge.b-apikey{color:#b45309;border-color:#fde3b3;background:#fffaf0}
+  .badge.b-none{color:#15803d;border-color:#bfe8cd;background:#f0fdf4}
+  .badge.b-basic{color:#7c3aed;border-color:#ddd0fb;background:#f7f3ff}
+  .badge.b-query{color:#4f46e5;border-color:#d4d6fb;background:#f4f4ff}
+  .try{padding:7px 16px;border-radius:9px;border:1px solid var(--accent);
+    background:#fff;color:var(--accent);cursor:pointer;font-weight:600;font-size:13px}
+  .try:hover{background:var(--accent);color:#fff}
+  .ep-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,440px);gap:22px;padding:16px 18px 20px}
+  .ep-left,.ep-right{min-width:0}
+  .ep-right{position:sticky;top:14px;align-self:start}
+  .ep-desc{color:#33456f;margin:0 0 12px;max-width:80ch}
+  h4{margin:16px 0 8px;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:#46598a}
+  .ep-right h4:first-child{margin-top:0}
+  table.params{width:100%;border-collapse:collapse}
+  table.params th,table.params td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top;font-size:13px}
+  table.params th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  table.params code{color:#274ea8;background:#eef2fb;padding:1px 5px;border-radius:5px}
+  .req{color:#e11d48;font-size:11px;font-weight:700}
+  .opt{color:var(--muted);font-size:11px}
+
+  .codewrap{border:1px solid #1d2b47;border-radius:12px;overflow:hidden;background:#0b1220}
+  .codetabs{display:flex;gap:2px;background:#0e1830;border-bottom:1px solid #1d2b47;padding:6px 8px 0;flex-wrap:wrap;align-items:center}
+  .codetabs button{padding:7px 11px;border:none;background:transparent;color:#8fa3cc;cursor:pointer;border-radius:8px 8px 0 0;font-size:12.5px}
+  .codetabs button.on{background:#0b1220;color:#fff;box-shadow:0 -2px 0 var(--accent) inset}
+  .copy{margin-left:auto;align-self:center;padding:5px 11px;border-radius:7px;border:1px solid #27355c;background:#0e1830;color:#8fa3cc;cursor:pointer;font-size:11.5px}
+  .copy:hover{color:#fff;border-color:var(--accent)}
+  .codewrap pre{border:none;border-radius:0;max-height:420px}
+
+  .resptabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+  .resptabs button{padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:#f1f5fd;color:var(--muted);cursor:pointer;font-size:12px;font-family:var(--mono)}
+  .resptabs button.on{border-color:#0f2a63;background:#0f2a63;color:#fff}
+  .tryout{margin-top:14px;border:1px dashed #c9d4ea;background:#f8faff;border-radius:12px;padding:12px}
+  .tryout h4{margin-top:0}
+  .tryout .status{font-family:var(--mono);margin-bottom:6px;font-size:12.5px}
+  .tryout .status.ok{color:#15803d} .tryout .status.err{color:#e11d48}
+  .note{background:#eef4ff;border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 10px 10px 0;color:#33487a;font-size:13px;margin:10px 0}
+  .note code{color:#274ea8;background:#fff;padding:1px 5px;border-radius:5px}
+  .note table{width:100%;border-collapse:collapse;margin-top:6px}
+  .note th,.note td{border-bottom:1px solid #d7e2fa;padding:5px 6px;text-align:left;vertical-align:top;font-size:12.5px}
+  .note th{color:var(--muted);font-size:11px;text-transform:uppercase}
+  .foot{margin-top:40px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:16px}
+  .sec-title{margin:34px 0 4px;font-size:17px;color:#0f2557}
+  @media (max-width:1080px){
+    .ep-body{grid-template-columns:1fr}
+    .ep-right{position:static}
+  }
+  @media (max-width:900px){
+    aside{display:none}
+    main{padding:18px 14px 60px}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+<aside>
+  <div class="brand">
+    <h1><span>TTPG API</span></h1>
+    <p>Dokumentasi interaktif</p>
+  </div>
+  <div class="searchwrap"><input id="q" type="search" placeholder="Cari endpoint… (mis. guest, gate, print)"></div>
+  <nav id="nav"></nav>
+</aside>
+
+<main>
+  <div class="hero">
+    <h2>Dokumentasi API TTPG</h2>
+    <p>Terminal Tiket &amp; Gate + modul Penginapan. 3 MySQL (<code>ttpg_auth</code>, <code>ttpg</code>, <code>ttpg_penginapan</code>) + MongoDB (<code>ttpg</code>).
+       Semua endpoint, parameter, body, dan contoh respons ada di bawah — lengkap dengan snippet cURL, PHP, Python, Node.js, dan Go.</p>
+    <div class="toolbar">
+      <div class="f">
+        <label>Base URL</label>
+        <input id="base" spellcheck="false">
+      </div>
+      <div class="f">
+        <label>JWT token (untuk /auth/login → endpoint JWT &amp; “Coba”)</label>
+        <input id="jwt" type="password" spellcheck="false" placeholder="tempel token dari POST /auth/login">
+      </div>
+      <div class="f" style="flex:0 1 150px">
+        <label>API key literal</label>
+        <input id="apikey" spellcheck="false" value="12345">
+      </div>
+      <div>
+        <label>Bahasa snippet</label>
+        <div class="langs" id="langpick"></div>
+      </div>
+    </div>
+    <p class="hint">Halaman ini disajikan langsung oleh server (public, tanpa auth) di <code id="selfurl">/docs</code>.
+      Token &amp; API key di toolbar hanya dipakai browser Anda (localStorage) untuk fitur <b>Coba</b> — tidak dikirim ke mana pun selain Base URL di atas.</p>
+  </div>
+
+  <section class="guide">
+    <h3>Ringkasan Auth</h3>
+    <table>
+      <tr><th>Cara</th><th>Header</th><th>Dipakai untuk</th></tr>
+      <tr><td>Tanpa auth</td><td>—</td><td><code>/auth/login</code>, <code>/auth/key</code>, <code>/boarding/print/:code</code>, <code>/penginapan/payments/:id/receipt</code>, <code>/ws</code>, <code>/docs</code></td></tr>
+      <tr><td>JWT</td><td><code>Authorization: Bearer &lt;token&gt;</code></td><td>semua route protected — token dari <code>/auth/login</code>, berlaku 1 minggu</td></tr>
+      <tr><td>Basic</td><td><code>Authorization: Basic base64(user:pass)</code></td><td>semua route protected — user aktif di <code>ttpg_users.user</code> (bcrypt)</td></tr>
+      <tr><td>API key user</td><td><code>X-ttpg-key: dev-key-123</code> atau <code>X-API-Key</code></td><td>semua route protected — cocok <code>user.secret_key</code> di <code>ttpg_users</code></td></tr>
+      <tr><td>API key literal</td><td><code>X-ttpg-key: 12345</code> atau <code>X-API-Key</code></td><td>semua route protected — cocok literal dengan env <code>API_KEY</code> (superkey, <code>user_id=0</code>)</td></tr>
+    </table>
+    <div class="note">Satu middleware seragam (<code>auth.AuthMiddleware</code>): header API key (literal env <code>API_KEY</code> dulu, baru <code>user.secret_key</code>) → <code>Authorization</code> (Bearer/Basic). Digest dilepas. Lalu aturan endpoint dari tabel <code>api_url</code>/<code>access</code> (skema wajib + izin) — ditolak → 403. Gagal auth → 401 + <code>WWW-Authenticate</code> (Basic). Semua request dicatat async ke <code>logs</code>.</div>
+    <h3>Format response</h3>
+    <p style="color:var(--muted);margin:6px 0"><b>A. Standar</b> — <code>/auth/login</code>, <code>/tujuan</code>, <code>/po</code>, <code>/boarding*</code>, seluruh <code>/penginapan/*</code>:</p>
+    <pre>{
+  "success": true,
+  "message": "…",
+  "data": …,
+  "pagination": { "page": 1, "limit": 100, "total": 0, "total_pages": 0 }   // opsional
+}</pre>
+    <p style="color:var(--muted);margin:10px 0 6px"><b>B. Mentah</b> — <code>/gate</code>, <code>/checkin-mandiri</code>, <code>/boardingpass*</code> (shape per endpoint, lihat masing-masing contoh).</p>
+  </section>
+
+  <div id="endpoints"></div>
+
+</main>
+</div>
+
+<script>
+/* ========================= DATA ENDPOINT ========================= */
+const LANGS = [
+  {id:"curl",   label:"cURL"},
+  {id:"php",    label:"PHP"},
+  {id:"python", label:"Python"},
+  {id:"node",   label:"Node.js"},
+  {id:"go",     label:"Go"}
+];
+const SAMPLE = {id:"1", key:"nama_hotel", code:"ABC123"};
+
+const GROUPS = [
+{id:"auth", title:"Autentikasi", items:[
+ {id:"login", method:"POST", path:"/auth/login", auth:"none", desc:"Login dengan username/password → JWT (berlaku 1 minggu) + info user.",
+  body:{example:{username:"admin", password:"admin123"}, fields:[
+    {name:"username", type:"string", req:true, desc:"username user"},
+    {name:"password", type:"string", req:true, desc:"password user"}]},
+  responses:[
+    {code:200, label:"OK", example:{success:true, message:"Login berhasil", data:{token:"<jwt>", user_id:1, role:"admin", expire:"2026-10-21T10:00:00+07:00"}}},
+    {code:401, label:"Salah", example:{success:false, message:"Username atau password salah", errors:null}}]},
+ {id:"authkey", method:"GET", path:"/auth/key", auth:"basic", desc:"Ambil API key user (Basic auth). Shape khusus: {status, data, message}.",
+  responses:[
+    {code:200, label:"OK", example:{status:true, data:{username:"admin", po_id:"PO001", production_key:"prod-key-123", development_key:"dev-key-123"}, message:""}},
+    {code:401, label:"Unauthorized", example:{status:false, data:null, message:"unauthorized"}}]}
+]},
+{id:"gate", title:"Gate & Checkin Mandiri", items:[
+ {id:"gate", method:"POST", path:"/gate", auth:"apikey", desc:"Scan gate. Cari boardingpass by noreg; fallback ke API tiket eksternal bila tidak ada lokal. Maks 5 scan; rescan kedaluwarsa 5 menit.",
+  params:[{name:"X-Device-ID", in:"header", type:"string", req:false, desc:"device pengirim (default: IP client)"}],
+  body:{example:{noreg:"ABC123", gate_id:1}, fields:[
+    {name:"noreg", type:"string", req:true, desc:"kode boardingpass"},
+    {name:"gate_id", type:"int", req:false, desc:"id gate"}]},
+  responses:[
+    {code:200, label:"OK", example:{success:true, reason:"VALID CHECKIN"}},
+    {code:400, label:"Bad Request", example:{error:"noreg wajib diisi"}}],
+  notes:`<b>Arti <code>reason</code>:</b>
+<table class="params" style="margin-top:6px"><tr><th>reason</th><th>Keterangan</th></tr>
+<tr><td><code>BYPASS MODE</code></td><td>env BYPASS=true, selalu lolos</td></tr>
+<tr><td><code>VALID via LIST_ID_CARD</code></td><td>noreg ada di env LIST_ID_CARD</td></tr>
+<tr><td><code>VALID via API TICKET</code></td><td>tidak ada lokal → record baru dari API tiket (PO122)</td></tr>
+<tr><td><code>VALID CHECKIN</code></td><td>fungsi checkin/checking → lolos, jadi gatein</td></tr>
+<tr><td><code>VALID RESCAN</code></td><td>sudah gatein/gateout, scan ≤ 5 &lt; 5 menit</td></tr>
+<tr><td><code>MAXIMUM SCAN TERCAPAI</code></td><td>count_scan ≥ 5 → tolak</td></tr>
+<tr><td><code>SCAN SUDAH EXPIRED</code></td><td>scan terakhir &gt; 5 menit → tolak</td></tr></table>`},
+ {id:"checkin", method:"POST", path:"/checkin-mandiri", auth:"apikey", desc:"Check-in mandiri dari ticket_id. Cari di Mongo boarding (status=active); opsional fallback Damri. Insert terminal_boardingpass (fungsi=checkin) + dokumen Mongo boardingpass, transaksional.",
+  body:{example:{ticket_id:"TKT-001"}, fields:[
+    {name:"ticket_id", type:"string", req:true, desc:"id tiket (JSON atau form)"}]},
+  responses:[
+    {code:201, label:"Berhasil", example:{status:true, id:123, noreg:"CMa1b2…", ticket_id:"TKT-001", source:"mongodb", pembelian_dari:"loket", print_url:"http://…/boarding/print/CM…?…", message:"checkin mandiri berhasil"}},
+    {code:200, label:"Sudah checkin", example:{status:true, message:"boardingpass sudah checkin hari ini", data:{id:1, noreg:"…", ticket_id:"…", fungsi:"checkin", print_url:"…"}}},
+    {code:409, label:"Konflik", example:{status:false, message:"boardingpass dengan ticket_id ini sudah ada hari ini", data:{id:1, noreg:"…", ticket_id:"…", print_url:"…"}}},
+    {code:404, label:"Tidak ada", example:{status:false, message:"ticket_id tidak ditemukan"}},
+    {code:504, label:"Damri timeout", example:{status:false, message:"request damri timeout"}}]}
+]},
+{id:"bp", title:"Boardingpass (MySQL)", items:[
+ {id:"bp-list", method:"GET", path:"/boardingpass", auth:"apikey", desc:"List boardingpass (hanya deleted IS NULL), urut id DESC. Format mentah {data, total}.",
+  params:[
+    {name:"noreg", in:"query", type:"string", req:false, desc:"LIKE"},
+    {name:"id_po", in:"query", type:"string", req:false, desc:"exact"},
+    {name:"fungsi", in:"query", type:"string", req:false, desc:"exact"},
+    {name:"id_tujuan", in:"query", type:"int", req:false, desc:"wajib numerik"},
+    {name:"limit", in:"query", type:"int", req:false, desc:"1–1000, default 100"},
+    {name:"offset", in:"query", type:"int", req:false, desc:"default 0"}],
+  responses:[
+    {code:200, label:"OK", example:{data:[{id:6, noreg:"SCAN001", id_po:"PO001", id_tujuan:2, nopol:"B 1234 XY", tanggal_berangkat:"2026-10-13T00:00:00Z", jam_berangkat:"08:30:00", nama_pnp:"Uji Coba", fungsi:"checkin", count_scan:0, created:"2026-10-13 04:35:59"}], total:1}},
+    {code:400, label:"Invalid", example:{error:"limit harus 1-1000"}}]},
+ {id:"bp-get", method:"GET", path:"/boardingpass/:id", auth:"apikey", desc:"Detail boardingpass apa adanya (kolom sql.Null* ter-serialize {String/Int64/Valid}).",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id baris"}],
+  responses:[
+    {code:200, label:"OK", example:{id:1, noreg:"…", ticket_id:"…", id_po:"…", id_tujuan:1, nopol:"…", tanggal_berangkat:"2026-10-12", jam_berangkat:"08:00:00", nama_pnp:"…", sex_pnp:{String:"L", Valid:true}, fungsi:{String:"checkin", Valid:true}, gate_id:{Int64:0, Valid:false}, count_scan:{Int64:0, Valid:true}, created:"…"}},
+    {code:404, label:"Tidak ada", example:{error:"boardingpass tidak ditemukan"}}]},
+ {id:"bp-create", method:"POST", path:"/boardingpass", auth:"apikey", desc:"Buat boardingpass. Field kosong (nama_pnp, tanggal_berangkat, jam_berangkat, nopol) diambil dari API tiket eksternal. Wajib: noreg.",
+  body:{example:{noreg:"ABC123", ticket_id:"TKT-001", id_po:"PO001", id_tujuan:1, nopol:"B 1234 XY", tanggal_berangkat:"2026-10-12", jam_berangkat:"08:00:00", nama_pnp:"Budi", sex_pnp:"L", fungsi:"checking", retribusi:0, pembelian_dari:"loket"}},
+  responses:[
+    {code:201, label:"Created", example:{id:123, message:"boardingpass berhasil dibuat", api_data:{noreg:"ABC123", nama_pnp:"Budi", tujuan:"Bekasi", nopol:"B 1234 XY"}}},
+    {code:404, label:"Tiket tak ada", example:{error:"noreg tidak ditemukan di sistem tiket"}},
+    {code:409, label:"Duplikat", example:{error:"boardingpass dengan noreg ini sudah ada"}}]},
+ {id:"bp-update", method:"PUT", path:"/boardingpass/:id", auth:"apikey", desc:"Update parsial — hanya field yang dikirim. gate_id/time_tab string kosong → NULL; count_scan ≥ 0.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id baris"}],
+  body:{example:{fungsi:"gateout", gate_id:"1", device_id:"DEV1", time_tab:"2026-01-02 10:20:30", count_scan:3}},
+  responses:[
+    {code:200, label:"OK", example:{id:2, noreg:"GATE002", fungsi:{String:"gateout", Valid:true}, gate_id:{Int64:1, Valid:true}, count_scan:{Int64:3, Valid:true}}},
+    {code:400, label:"Invalid", example:{error:"tidak ada field yang diupdate"}},
+    {code:404, label:"Tidak ada", example:{error:"boardingpass tidak ditemukan"}}]},
+ {id:"bp-delete", method:"DELETE", path:"/boardingpass/:id", auth:"apikey", desc:"Soft delete (deleted = NOW(); baris disembunyikan dari GET/list).",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id baris"}],
+  responses:[
+    {code:200, label:"OK", example:{message:"boardingpass berhasil dihapus"}},
+    {code:404, label:"Tidak ada", example:{error:"boardingpass tidak ditemukan"}}]},
+ {id:"print", method:"GET", path:"/boarding/print/:code", auth:"none", desc:"Public. HTML siap cetak 78mm + QR. :code = noreg ATAU ticket_id (deleted IS NULL). Alias lama: GET /boardingpass/print/:code (sama persis).",
+  params:[
+    {name:"code", in:"path", type:"string", req:true, desc:"noreg atau ticket_id"},
+    {name:"nama_pnp", in:"query", type:"string", req:false, desc:"print instan — jika SEMUA param berikut terisi, DB tidak dipanggil"},
+    {name:"nama_po", in:"query", type:"string", req:false, desc:"print instan"},
+    {name:"tujuan", in:"query", type:"string", req:false, desc:"print instan"},
+    {name:"tanggal_berangkat", in:"query", type:"string", req:false, desc:"YYYY-MM-DD"},
+    {name:"jam_berangkat", in:"query", type:"string", req:false, desc:"HH:MM:SS"},
+    {name:"ticket_id", in:"query", type:"string", req:false, desc:"print instan (opsional)"},
+    {name:"autoprint", in:"query", type:"string", req:false, desc:"1 → window.print() otomatis"}],
+  responses:[
+    {code:200, label:"HTML", example:"<!doctype html>\n<html>… boardingpass 78mm + QR …</html>"},
+    {code:404, label:"Tidak ada", example:{status:false, message:"boardingpass tidak ditemukan"}}]}
+]},
+{id:"master", title:"Master Data", items:[
+ {id:"tujuan", method:"GET", path:"/tujuan", auth:"jwt", desc:"Daftar tujuan (tbl_tujuan, semua kolom), urut id_tujuan.",
+  responses:[{code:200, label:"OK", example:{success:true, message:"Data tujuan ditemukan", data:[{id_tujuan:1, tujuan:"Jakarta", kawasan:"Jawa", kode_tujuan:""}]}}]},
+ {id:"po", method:"GET", path:"/po", auth:"jwt", desc:"Daftar PO — hanya id_po & nama_po, urut id_po.",
+  responses:[{code:200, label:"OK", example:{success:true, message:"Data po ditemukan", data:[{id_po:1, nama_po:"PO Contoh"}]}}]}
+]},
+{id:"boarding", title:"Boarding (MongoDB)", items:[
+ {id:"b-list", method:"GET", path:"/boarding", auth:"jwt", desc:"List dokumen koleksi ttpg.boarding (wajib paginasi). destination_id menerima int / string \"395\" / object {id_tujuan}; filter memakai $or ketiganya.",
+  params:[
+    {name:"po_id", in:"query", type:"string", req:false, desc:"disaring juga ke po_id user"},
+    {name:"ticket_id", in:"query", type:"string", req:false, desc:"exact"},
+    {name:"destination_id", in:"query", type:"int", req:false, desc:"numerik — dokumen lama string/object ikut cocok"},
+    {name:"limit", in:"query", type:"int", req:false, desc:"1–1000, default 100"},
+    {name:"offset", in:"query", type:"int", req:false, desc:"default 0"}],
+  responses:[
+    {code:200, label:"OK", example:{success:true, message:"Data boarding ditemukan", data:[{boarding_id:8652, ticket_id:"K2403003167", po_id:"PO057", destination_id:395, status:"active", pnp:[{name:"…", gender:"P"}], user_id:1}], pagination:{page:1, limit:100, total:1235253, total_pages:12353}}},
+    {code:400, label:"Invalid", example:{success:false, message:"limit harus 1-1000", errors:[{field:"limit", code:"VALIDATION_ERROR"}]}}]},
+ {id:"b-create", method:"POST", path:"/boarding", auth:"jwt", desc:"Buat dokumen boarding. name boleh multi (pisah , atau ;) → array pnp; gender dipasangkan per index. 1 po_id user → auto-fill.",
+  body:{example:{po_id:"PO001", ticket_id:"TKT-001", nopol:"B 1234 XY", destination_id:1, date_of_departure:"2026-10-12", time_of_departure:"08:00:00", nik:"…", name:"Budi, Joko", gender:"L,L", address:"…", city:"…", province:"…", telp:"…", email:"…"}, fields:[
+    {name:"ticket_id", type:"string", req:true, desc:"—"},
+    {name:"destination_id", type:"int", req:true, desc:"—"},
+    {name:"date_of_departure", type:"string", req:true, desc:"YYYY-MM-DD"},
+    {name:"time_of_departure", type:"string", req:true, desc:"HH:MM:SS"},
+    {name:"name", type:"string", req:true, desc:"boleh multi dipisah koma/titik-koma"}]},
+  responses:[
+    {code:201, label:"Created", example:{success:true, message:"Boarding berhasil dibuat", data:{_id:"65ef24175411a6228b447fa6", boarding_id:1760101010, ticket_id:"TKT-001", status:"active", po_id:"PO001"}}},
+    {code:403, label:"po_id tolak", example:{success:false, message:"po_id tidak diizinkan untuk user ini"}},
+    {code:400, label:"Invalid", example:{success:false, message:"Data tidak valid", errors:[{code:"VALIDATION_ERROR", detail:"…"}]}}]},
+ {id:"b-update", method:"PUT", path:"/boarding/:id", auth:"jwt", desc:"Update parsial dokumen boarding. :id = ObjectId hex.",
+  params:[{name:"id", in:"path", type:"string", req:true, desc:"Mongo ObjectId hex (24 char)"}],
+  body:{example:{nopol:"B 8888 XY", status:"inactive", date_of_departure:"2026-10-16", time_of_departure:"09:00:00", destination_id:2}},
+  responses:[
+    {code:200, label:"OK", example:{success:true, message:"Boarding berhasil diupdate", data:null}},
+    {code:404, label:"Tidak ada", example:{success:false, message:"Boarding tidak ditemukan"}},
+    {code:400, label:"Invalid id", example:{success:false, message:"id tidak valid"}}]},
+ {id:"b-delete", method:"DELETE", path:"/boarding/:id", auth:"jwt", desc:"Hapus dokumen boarding (hard delete).",
+  params:[{name:"id", in:"path", type:"string", req:true, desc:"Mongo ObjectId hex"}],
+  responses:[
+    {code:200, label:"OK", example:{success:true, message:"Boarding berhasil dihapus", data:null}},
+    {code:404, label:"Tidak ada", example:{success:false, message:"Boarding tidak ditemukan"}}]}
+]},
+{id:"pg-config", title:"Penginapan — Config & Lookups", items:[
+ {id:"cfg-list", method:"GET", path:"/penginapan/configs", auth:"jwt", desc:"List config key/value (key_configs, value_configs)."},
+ {id:"cfg-key", method:"GET", path:"/penginapan/configs/key/:key", auth:"jwt", desc:"Ambil 1 config by key_configs.",
+  params:[{name:"key", in:"path", type:"string", req:true, desc:"key config"}],
+  responses:[{code:200, label:"OK", example:{success:true, message:"Config ditemukan", data:{id_configs:1, key_configs:"nama_hotel", value_configs:"Hotel Contoh"}}},
+             {code:404, label:"Tidak ada", example:{success:false, message:"Config tidak ditemukan"}}]},
+ {id:"cfg-create", method:"POST", path:"/penginapan/configs", auth:"jwt", desc:"Buat config (key unique).",
+  body:{example:{key_configs:"nama_hotel", value_configs:"Hotel Contoh"}}},
+ {id:"cfg-update", method:"PUT", path:"/penginapan/configs/:id", auth:"jwt", desc:"Update parsial config.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id_configs"}],
+  body:{example:{key_configs:"nama_hotel", value_configs:"Hotel Baru"}}},
+ {id:"cfg-delete", method:"DELETE", path:"/penginapan/configs/:id", auth:"jwt", desc:"Hapus config.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id_configs"}]},
+ {id:"pm-list", method:"GET", path:"/penginapan/payment-methods", auth:"jwt", desc:"List metode pembayaran (seed: cash, qris, transfer, debit, lainnya)."},
+ {id:"pm-create", method:"POST", path:"/penginapan/payment-methods", auth:"jwt", desc:"Tambah metode pembayaran (code unique).",
+  body:{example:{code:"va", name:"Virtual Account", is_active:true, sort_order:5}}},
+ {id:"pm-update", method:"PUT", path:"/penginapan/payment-methods/:id", auth:"jwt", desc:"Update metode pembayaran (parsial).",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}],
+  body:{example:{name:"Virtual Account BCA", is_active:false}}},
+ {id:"pm-delete", method:"DELETE", path:"/penginapan/payment-methods/:id", auth:"jwt", desc:"Hapus — 409 bila sudah dipakai payment.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}],
+  responses:[{code:409, label:"Dipakai", example:{success:false, message:"metode pembayaran sedang dipakai"}}]},
+ {id:"ps-list", method:"GET", path:"/penginapan/purchase-sources", auth:"jwt", desc:"List sumber pembelian (seed: langsung, mesin)."},
+ {id:"ps-create", method:"POST", path:"/penginapan/purchase-sources", auth:"jwt", desc:"Tambah sumber pembelian.",
+  body:{example:{code:"midtrans", name:"Midtrans", is_active:true, sort_order:3}}},
+ {id:"ps-update", method:"PUT", path:"/penginapan/purchase-sources/:id", auth:"jwt", desc:"Update sumber pembelian (parsial).",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}],
+  body:{example:{name:"Midtrans VA"}}},
+ {id:"ps-delete", method:"DELETE", path:"/penginapan/purchase-sources/:id", auth:"jwt", desc:"Hapus — 409 bila sudah dipakai payment.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}]}
+]},
+{id:"pg-room", title:"Penginapan — Lokasi & Kamar", items:[
+ {id:"loc-list", method:"GET", path:"/penginapan/locations", auth:"jwt", desc:"List lokasi (name, keterangan)."},
+ {id:"loc-get", method:"GET", path:"/penginapan/locations/:id", auth:"jwt", desc:"Detail lokasi.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}]},
+ {id:"loc-create", method:"POST", path:"/penginapan/locations", auth:"jwt", desc:"Buat lokasi.",
+  body:{example:{name:"Gedung A", keterangan:"Lantai 1–2"}}},
+ {id:"loc-update", method:"PUT", path:"/penginapan/locations/:id", auth:"jwt", desc:"Update parsial lokasi.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}],
+  body:{example:{name:"Gedung A (Baru)"}}},
+ {id:"loc-delete", method:"DELETE", path:"/penginapan/locations/:id", auth:"jwt", desc:"Hapus lokasi.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}]},
+ {id:"room-list", method:"GET", path:"/penginapan/rooms", auth:"jwt", desc:"List kamar + location preload + current_occupants. room_number unik per lokasi (index komposit).",
+  params:[
+    {name:"status", in:"query", type:"string", req:false, desc:"kosong | terisi | maintenance"},
+    {name:"location_id", in:"query", type:"int", req:false, desc:"—"},
+    {name:"room_type", in:"query", type:"string", req:false, desc:"pria | wanita"}],
+  responses:[{code:200, label:"OK", example:{success:true, message:"Data kamar ditemukan", data:[{id:1, location_id:1, room_number:"201", room_type:"pria", capacity:2, current_occupants:1, status:"terisi", location:{id:1, name:"Gedung A"}}]}}]},
+ {id:"room-get", method:"GET", path:"/penginapan/rooms/:id", auth:"jwt", desc:"Detail kamar.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}]},
+ {id:"room-create", method:"POST", path:"/penginapan/rooms", auth:"jwt", desc:"Buat kamar. (location_id, room_number) unik — 409 bila kembar. Broadcast event WS type=room.",
+  body:{example:{location_id:1, room_number:"201", room_type:"pria", capacity:2}, fields:[
+    {name:"room_number", type:"string", req:true, desc:"unik per lokasi"},
+    {name:"room_type", type:"string", req:true, desc:"pria | wanita"},
+    {name:"location_id", type:"int", req:false, desc:"—"},
+    {name:"capacity", type:"int", req:false, desc:"default 1"}]},
+  responses:[{code:201, label:"Created", example:{success:true, message:"Kamar berhasil dibuat", data:{id:5, room_number:"201", status:"kosong", current_occupants:0, location_id:1}}}]},
+ {id:"room-update", method:"PUT", path:"/penginapan/rooms/:id", auth:"jwt", desc:"Update parsial kamar.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}],
+  body:{example:{room_number:"201A", capacity:3}}},
+ {id:"room-status", method:"PUT", path:"/penginapan/rooms/:id/status", auth:"jwt", desc:"Set status manual. terisi dihitung otomatis dari check-in (tolak 400); kosong ditolak (409) bila masih ada occupant.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}],
+  body:{example:{status:"maintenance"}, fields:[{name:"status", type:"string", req:true, desc:"kosong | maintenance (terisi otomatis)"}]},
+  responses:[{code:200, label:"OK", example:{success:true, message:"Status kamar berhasil diupdate", data:{id:5, status:"maintenance", room_number:"201", current_occupants:0}}},
+             {code:409, label:"Masih terisi", example:{success:false, message:"kamar masih terisi, tidak bisa di-set kosong"}}]},
+ {id:"room-delete", method:"DELETE", path:"/penginapan/rooms/:id", auth:"jwt", desc:"Hapus kamar — 409 bila ada tamu aktif.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}],
+  responses:[{code:409, label:"Ada tamu", example:{success:false, message:"kamar masih memiliki tamu aktif"}}]},
+ {id:"layout-list", method:"GET", path:"/penginapan/room-layouts", auth:"jwt", desc:"Layout tampilan kamar (preload location, room).",
+  params:[{name:"location_id", in:"query", type:"int", req:false, desc:"—"}]},
+ {id:"layout-create", method:"POST", path:"/penginapan/room-layouts", auth:"jwt", desc:"Buat baris layout. room_id terisi → location_id otomatis dari room.",
+  body:{example:{location_id:1, room_id:1, row_number:1, urutan:1}}},
+ {id:"layout-update", method:"PUT", path:"/penginapan/room-layouts/:id", auth:"jwt", desc:"Update parsial layout.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}],
+  body:{example:{row_number:2, urutan:3}}},
+ {id:"layout-delete", method:"DELETE", path:"/penginapan/room-layouts/:id", auth:"jwt", desc:"Hapus baris layout.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}]}
+]},
+{id:"pg-guest", title:"Penginapan — Tamu (Check-in/Out)", items:[
+ {id:"g-list", method:"GET", path:"/penginapan/guests", auth:"jwt", desc:"List tamu + summary pembayaran (total_bayar, sisa, lunas) + room. Limit 500.",
+  params:[
+    {name:"status", in:"query", type:"string", req:false, desc:"inhouse | out"},
+    {name:"room_id", in:"query", type:"int", req:false, desc:"—"},
+    {name:"checkin_date", in:"query", type:"string", req:false, desc:"YYYY-MM-DD"}],
+  responses:[{code:200, label:"OK", example:{success:true, message:"Data tamu ditemukan", data:[{id:1, room_id:1, name:"Budi", gender:"pria", harga:100000, checkin_date:"2026-10-13T00:00:00Z", checkin_time:"14:00:00", checkout_date:null, room:{room_number:"201"}, total_bayar:100000, sisa:0, lunas:true}]}}]},
+ {id:"g-get", method:"GET", path:"/penginapan/guests/:id", auth:"jwt", desc:"Detail tamu + room + summary.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id tamu"}]},
+ {id:"g-checkin", method:"POST", path:"/penginapan/guests", auth:"jwt", desc:"Check-in transaksional: N tamu + payment opsional (allocations total = amount; 1 tamu → alokasi otomatis). Occupancy kamar disinkron; 409 bila penuh/maintenance.",
+  body:{example:{guests:[{room_id:1, name:"Budi", nik:"3273…", gender:"pria", harga:100000, checkin_date:"2026-10-13", checkin_time:"14:00"}, {room_id:1, name:"Joko", gender:"pria", harga:80000}], payment:{amount:180000, payment_method_id:1, source_id:1, status:"pending", allocations:[{guest_index:0, amount:100000}, {guest_index:1, amount:80000}]}}, fields:[
+    {name:"guests", type:"array", req:true, desc:"min 1; gender pria|wanita"},
+    {name:"payment", type:"object", req:false, desc:"status default lunas; allocations wajib bila >1 tamu"}]},
+  responses:[
+    {code:201, label:"Berhasil", example:{success:true, message:"Check-in berhasil", data:{guests:[{id:1, name:"Budi", harga:100000, total_bayar:100000, sisa:0, lunas:true}], payment:{id:1, amount:180000, status:"pending", guests:[{guest_id:1, amount:100000}, {guest_id:2, amount:80000}]}}}},
+    {code:409, label:"Kamar penuh", example:{success:false, message:"kamar sudah penuh atau maintenance"}},
+    {code:404, label:"Kamar tak ada", example:{success:false, message:"kamar tidak ditemukan"}}]},
+ {id:"g-update", method:"PUT", path:"/penginapan/guests/:id", auth:"jwt", desc:"Update nama/nik/gender/harga (harga baru dihitung ulang lunas/sisa).",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id tamu"}],
+  body:{example:{name:"Budi Santoso", nik:"3273…", gender:"pria", harga:120000}}},
+ {id:"g-checkout", method:"POST", path:"/penginapan/guests/:id/checkout", auth:"jwt", desc:"Check-out (default: sekarang). Isi checkout_date/time + history check-out; 409 bila sudah pernah.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id tamu"}],
+  body:{example:{checkout_date:"2026-10-14", checkout_time:"11:00"}}},
+ {id:"g-pindah", method:"POST", path:"/penginapan/guests/:id/pindah", auth:"jwt", desc:"Pindah kamar: update room_id in-place + history pindah (note \"lama -> baru\"). Occupancy dua kamar disinkron.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id tamu"}],
+  body:{example:{room_id:4}},
+  responses:[{code:200, label:"OK", example:{success:true, message:"Tamu berhasil pindah kamar", data:{guest_id:1, room_lama:{id:1, room_number:"201"}, room_baru:{id:4, room_number:"302"}}}},
+             {code:400, label:"Sama", example:{success:false, message:"room_id sama dengan kamar saat ini"}}]},
+ {id:"g-hist", method:"GET", path:"/penginapan/guests/:id/histories", auth:"jwt", desc:"History tamu: check-in / check-out / pindah.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id tamu"}],
+  responses:[{code:200, label:"OK", example:{success:true, message:"History tamu ditemukan", data:[{id:9, guest_id:1, room_id:1, status:"check-in", note:"mulai menginap", occurred_at:"2026-10-13T07:00:00Z"}, {id:10, guest_id:1, status:"pindah", note:"201 -> 302", occurred_at:"2026-10-13T09:00:00Z"}]}}]}
+]},
+{id:"pg-pay", title:"Penginapan — Pembayaran & History", items:[
+ {id:"p-list", method:"GET", path:"/penginapan/payments", auth:"jwt", desc:"List payment (preload guests, source, payment_method). Lunas = Σ alokasi status=lunas ≥ harga tamu; pending tidak dihitung.",
+  params:[
+    {name:"guest_id", in:"query", type:"int", req:false, desc:"—"},
+    {name:"status", in:"query", type:"string", req:false, desc:"pending | lunas | batal"},
+    {name:"source_id", in:"query", type:"int", req:false, desc:"—"},
+    {name:"payment_method_id", in:"query", type:"int", req:false, desc:"—"}]},
+ {id:"p-get", method:"GET", path:"/penginapan/payments/:id", auth:"jwt", desc:"Detail payment.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id payment"}]},
+ {id:"p-create", method:"POST", path:"/penginapan/payments", auth:"jwt", desc:"Payment manual (di luar check-in). guest_ids ≥ 1; 1 tamu → alokasi otomatis penuh; multi tamu → allocations (guest_id + amount, total = amount).",
+  body:{example:{amount:50000, payment_method_id:1, source_id:1, status:"lunas", guest_ids:[3], allocations:[], note:"DP"}, fields:[
+    {name:"amount", type:"int", req:true, desc:"min 1"},
+    {name:"payment_method_id", type:"int", req:true, desc:"—"},
+    {name:"source_id", type:"int", req:true, desc:"—"},
+    {name:"guest_ids", type:"[]int", req:true, desc:"min 1"},
+    {name:"allocations", type:"[]object", req:false, desc:"{guest_id, amount}; wajib bila >1 tamu, total = amount"},
+    {name:"status", type:"string", req:false, desc:"pending | lunas (default) | batal"},
+    {name:"note", type:"string", req:false, desc:"—"}]},
+  responses:[{code:201, label:"Created", example:{success:true, message:"Pembayaran berhasil dibuat", data:{id:5, amount:50000, status:"lunas", paid_at:"…", guests:[{guest_id:3, amount:50000}]}}},
+             {code:400, label:"Invalid", example:{success:false, message:"total alokasi harus sama dengan amount"}}]},
+ {id:"p-update", method:"PUT", path:"/penginapan/payments/:id", auth:"jwt", desc:"Update amount/method/source/status/note. 409 bila amount < total alokasi. status lunas mengisi paid_at.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id payment"}],
+  body:{example:{amount:80000, status:"lunas", note:"pelunasan"}}},
+ {id:"p-void", method:"DELETE", path:"/penginapan/payments/:id", auth:"jwt", desc:"Void: status → batal (alokasi berhenti dihitung lunas). 409 bila sudah batal.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id payment"}],
+  responses:[{code:200, label:"OK", example:{success:true, message:"Pembayaran dibatalkan", data:{id:5, status:"batal"}}},
+             {code:409, label:"Sudah batal", example:{success:false, message:"pembayaran sudah batal"}}]},
+ {id:"p-receipt", method:"GET", path:"/penginapan/payments/:id/receipt", auth:"none", desc:"Public (tanpa auth) — HTML struk pembayaran 78mm siap cetak. Baris per tamu dari alokasi payment (nama, kamar, jumlah) + TOTAL; status batal → cap DIBATALKAN; nama hotel dari config nama_hotel (fallback PENGINAPAN). Seperti /boarding/print: dibuka via window.open sehingga tidak butuh header.",
+  params:[
+    {name:"id", in:"path", type:"int", req:true, desc:"id payment"},
+    {name:"autoprint", in:"query", type:"string", req:false, desc:"1 → window.print() otomatis saat load"}],
+  responses:[
+    {code:200, label:"HTML", example:"<!doctype html>\n<html>… struk 78mm (STRUK PEMBAYARAN, baris tamu, TOTAL) …</html>"},
+    {code:404, label:"Tidak ada", example:{success:false, message:"Pembayaran tidak ditemukan"}}]},
+ {id:"p-qris", method:"GET", path:"/penginapan/qris", auth:"jwt", desc:"Payload QRIS untuk ditampilkan ke tamu saat check-in. Diambil dari config key qris_payload (string EMV QR statis / URL gambar QRIS); opsional config qris_merchant. 404 NOT_CONFIGURED bila belum diisi.",
+  responses:[
+    {code:200, label:"OK", example:{success:true, message:"Konfigurasi QRIS ditemukan", data:{payload:"00020101021126610014COM.GO-JEK.WWW0…", merchant:"Nama Merchant"}}},
+    {code:404, label:"Belum dikonfigurasi", example:{success:false, message:"QRIS belum dikonfigurasi", errors:[{code:"NOT_CONFIGURED", detail:"isi key_configs 'qris_payload' …"}]}}]},
+ {id:"rh-list", method:"GET", path:"/penginapan/room-histories", auth:"jwt", desc:"History per kamar (check-in / check-out / pindah / occupancy).",
+  params:[
+    {name:"room_id", in:"query", type:"int", req:false, desc:"—"},
+    {name:"guest_id", in:"query", type:"int", req:false, desc:"—"},
+    {name:"status", in:"query", type:"string", req:false, desc:"check-in | check-out | pindah"}]}
+]},
+{id:"ws", title:"WebSocket", items:[
+ {id:"ws", method:"WS", path:"/ws", auth:"query", special:"ws",
+  desc:"Real-time event penginapan. Route public — JWT dikirim sebagai query ?token= (401 sebelum upgrade bila kosong/salah). Client hanya menerima push (ping/pong otomatis ±54 detik).",
+  params:[{name:"token", in:"query", type:"string", req:true, desc:"JWT dari /auth/login"}],
+  responses:[
+    {code:101, label:"Switching Protocols", example:"(upgrade WebSocket berhasil — tidak ada body HTTP)"},
+    {code:401, label:"Tanpa token", example:{message:"unauthorized"}}]},
+ {id:"docs-page", method:"DOCS", path:"/docs", auth:"none", desc:"Halaman dokumentasi ini (HTML interaktif, public, tanpa auth). Versi markdown: docs/api.md di repositori."}
+]}
+];
+
+/* ========================= STATE ========================= */
+const state = {
+  base: localStorage.getItem("ttpg_base") || (location.origin && location.origin.startsWith("http") ? location.origin : "http://localhost:3080"),
+  jwt: localStorage.getItem("ttpg_jwt") || "",
+  apikey: localStorage.getItem("ttpg_apikey") || "12345",
+  lang: localStorage.getItem("ttpg_lang") || "curl"
+};
+const $ = s => document.querySelector(s);
+
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+function authLabel(a){
+  return {none:"Tanpa auth", apikey:"API key literal", jwt:"JWT", hashed:"JWT / API key user", basic:"Basic auth", query:"JWT via query"}[a]||a;
+}
+function authClass(a){return "b-"+a}
+
+function sampleUrlSimple(ep){
+  let path = ep.path.replace(/:([a-z_]+)/gi,(m,p)=>SAMPLE[p]||("sample-"+p));
+  let url = state.base + path;
+  const q=[];
+  if(ep.auth==="query") q.push("token="+ (state.jwt? state.jwt : "<JWT>"));
+  else (ep.params||[]).filter(p=>p.in==="query"&&p.sample!==undefined).forEach(p=>q.push(p.name+"="+p.sample));
+  if(q.length) url += "?"+q.join("&");
+  return url;
+}
+function authHeaders(ep, forTry){
+  const h={};
+  if(ep.auth==="apikey") h["X-ttpg-key"]= forTry? state.apikey : "12345";
+  if(ep.auth==="jwt") h["Authorization"]= forTry? ("Bearer "+(state.jwt||"<JWT>")) : "Bearer <JWT>";
+  if(ep.auth==="hashed") h["X-ttpg-key"]= forTry? (state.jwt? state.apikey : "dev-key-123") : "dev-key-123";
+  if(ep.auth==="basic") h["Authorization"]= "Basic YWRtaW46YWRtaW4xMjM=";
+  return h;
+}
+
+/* ========================= SNIPPETS ========================= */
+function pretty(o){return typeof o==="string"? o : JSON.stringify(o,null,2)}
+function genLang(ep, lang){
+  const url = sampleUrlSimple(ep);
+  const headers = authHeaders(ep,false);
+  const hasBody = !!ep.body && ep.method!=="GET" && ep.method!=="DOCS";
+  const body = hasBody? pretty(ep.body.example) : null;
+  const method = ep.method==="WS"? "WS" : ep.method;
+
+  if(lang==="curl"){
+    const lines=["curl -X "+method+" '"+url+"'"];
+    if(ep.method==="GET"||ep.method==="DOCS") lines[0]="curl '"+url+"'";
+    for(const [k,v] of Object.entries(headers)) lines.push("  -H '"+k+": "+v+"'");
+    if(hasBody) lines.push("  -H 'Content-Type: application/json' \\");
+    if(hasBody) lines.push("  -d '"+body.replace(/'/g,"'\\''")+"'");
+    return lines.join(" \\\n");
+  }
+  if(lang==="php"){
+    const hdrs=[...Object.entries(headers).map(([k,v])=>k+": "+v)];
+    if(hasBody) hdrs.push("Content-Type: application/json");
+    const l=[
+      "<?php",
+      "$ch = curl_init('"+url+"');",
+      "curl_setopt_array($ch, [",
+      "  CURLOPT_RETURNTRANSFER => true,",
+      "  CURLOPT_CUSTOMREQUEST => '"+method+"',",
+      "  CURLOPT_HTTPHEADER => [",
+      "    "+hdrs.map(h=>"'"+h+"'").join(",\n    "),
+      "  ],"+(hasBody? "\n  CURLOPT_POSTFIELDS => '"+body.replace(/'/g,"\\'")+"',":""),
+      "]);",
+      "$res = curl_exec($ch);",
+      "curl_close($ch);",
+      "echo $res, PHP_EOL;"
+    ];
+    return l.join("\n");
+  }
+  if(lang==="python"){
+    const hdrEntries=Object.entries(headers).concat(hasBody? [["Content-Type","application/json"]]:[]);
+    const l=["import requests","",
+      "res = requests.request(",
+      "    \""+method+"\",",
+      "    \""+url+"\",",
+      "    headers={"+hdrEntries.map(([k,v])=>JSON.stringify(k)+": "+JSON.stringify(v)).join(", ")+"},"];
+    if(hasBody) l.push("    data='''"+body+"''',");
+    l.push(")","print(res.status_code)","print(res.text)");
+    return l.join("\n");
+  }
+  if(lang==="node"){
+    const hdrEntries=Object.entries(headers).concat(hasBody? [["Content-Type","application/json"]]:[]);
+    const l=["const res = await fetch(\""+url+"\", {",
+      "  method: \""+method+"\",",
+      "  headers: {"+hdrEntries.map(([k,v])=>" "+JSON.stringify(k)+": "+JSON.stringify(v)).join(",")+" },"];
+    if(hasBody) l.push("  body: JSON.stringify("+body+"),");
+    l.push("});","console.log(res.status, await res.text());");
+    return l.join("\n");
+  }
+  if(lang==="go"){
+    const bt=String.fromCharCode(96);
+    const l=["package main","",
+      'import (',
+      '\t"fmt"',
+      '\t"io"',
+      '\t"net/http"',
+      '\t"strings"',
+      ")","",
+      "func main() {",
+      "\treq, _ := http.NewRequest(\""+method+"\", \""+url+"\", "+(hasBody? "strings.NewReader("+bt+body.replace(/`/g,"")+bt+")":"nil")+")"];
+    Object.entries(headers).forEach(([k,v])=>l.push("\treq.Header.Set(\""+k+"\", \""+v+"\")"));
+    if(hasBody) l.push("\treq.Header.Set(\"Content-Type\", \"application/json\")");
+    l.push("\tres, err := http.DefaultClient.Do(req)",
+      "\tif err != nil {",
+      "\t\tpanic(err)",
+      "\t}",
+      "\tdefer res.Body.Close()",
+      "\tb, _ := io.ReadAll(res.Body)",
+      "\tfmt.Println(res.StatusCode, string(b))",
+      "}");
+    return l.join("\n");
+  }
+  return "";
+}
+function wsSnippets(){
+  const url = state.base + "/ws?token=" + (state.jwt||"<JWT>");
+  return {
+    "Browser (JS)": "const ws = new WebSocket('"+url+"');\n\nws.onopen = () => console.log('CONNECTED');\nws.onmessage = (e) => {\n  const ev = JSON.parse(e.data);\n  // {type: 'room', data: {action: 'status', room: {...}}}\n  // {type: 'room', data: {action: 'occupancy', room: {...}}}\n  // {type: 'guest', data: {action: 'checkin', guest_ids: [1, 2]}}\n  console.log('EVENT', ev.type, ev.data);\n};\nws.onclose = () => console.log('CLOSED');",
+    "Go (gorilla-free)": "package main\n\nimport (\n\t\"context\"\n\t\"fmt\"\n\t\"time\"\n\n\t\"nhooyr.io/websocket\"\n)\n\nfunc main() {\n\tctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)\n\tdefer cancel()\n\tc, _, err := websocket.Dial(ctx, \""+state.base+"/ws?token="+ (state.jwt||"<JWT>") +"\", nil)\n\tif err != nil { panic(err) }\n\tdefer c.Close(websocket.StatusNormal, \"\")\n\tfor {\n\t\t_, b, err := c.Read(ctx)\n\t\tif err != nil { return }\n\t\tfmt.Println(string(b))\n\t}\n}",
+    "Terminal (wsclient resmi)": "# dari repositori:\ngo run ./scripts/testing/wsclient \""+state.base+"/ws?token=$TOKEN\" 15s\n# CONNECTED\n# EVENT type=room data={\"action\":\"status\",\"room\":{…}}"
+  };
+}
+
+/* ========================= RENDER ========================= */
+function langTabs(ep){
+  return LANGS.map(l=>'<button data-lang="'+l.id+'" class="'+(state.lang===l.id?"on":"")+'">'+l.label+"</button>").join("");
+}
+function paramsTable(ep){
+  if(!ep.params||!ep.params.length) return "";
+  const rows=ep.params.map(p=>{
+    const loc={query:"query",path:"path",header:"header"}[p.in]||p.in;
+    return "<tr><td><code>"+esc(p.name)+"</code> <span class='opt'>"+loc+"</span></td><td><code>"+esc(p.type)+"</code></td><td>"+(p.req?"<span class='req'>wajib</span>":"<span class='opt'>opsional</span>")+"</td><td>"+esc(p.desc||"")+"</td></tr>";
+  }).join("");
+  return "<h4>Parameter</h4><table class='params'><tr><th>Nama</th><th>Tipe</th><th></th><th>Keterangan</th></tr>"+rows+"</table>";
+}
+function bodySection(ep){
+  if(!ep.body) return "";
+  let out="<h4>Body request <span class='opt'>(JSON)</span></h4><div class='codewrap'><pre>"+esc(pretty(ep.body.example))+"</pre></div>";
+  if(ep.body.fields&&ep.body.fields.length){
+    const rows=ep.body.fields.map(f=>"<tr><td><code>"+esc(f.name)+"</code></td><td><code>"+esc(f.type)+"</code></td><td>"+(f.req?"<span class='req'>wajib</span>":"<span class='opt'>opsional</span>")+"</td><td>"+esc(f.desc||"")+"</td></tr>").join("");
+    out+="<table class='params' style='margin-top:8px'><tr><th>Field</th><th>Tipe</th><th></th><th>Keterangan</th></tr>"+rows+"</table>";
+  }
+  return out;
+}
+function respSection(ep){
+  const rs=ep.responses&&ep.responses.length? ep.responses : [{code:200,label:"OK",example:{success:true, message:"…", data:null}}];
+  const tabs=rs.map((r,i)=>'<button data-r="'+i+'" class="'+(i===0?"on":"")+'">'+r.code+" "+esc(r.label)+"</button>").join("");
+  const ex=rs.map((r,i)=>'<pre class="respex" data-r="'+i+'" style="'+(i===0?"":"display:none")+'">'+esc(pretty(r.example))+"</pre>").join("");
+  return "<h4>Contoh respons</h4><div class='resptabs'>"+tabs+"</div><div class='codewrap'>"+ex+"</div>";
+}
+function codeSection(ep){
+  if(ep.special==="ws"){
+    const sn=wsSnippets();
+    const names=Object.keys(sn);
+    const tabs=names.map((n,i)=>'<button data-ws="'+i+'" class="'+(i===0?"on":"")+'">'+esc(n)+"</button>").join("");
+    const bodies=names.map((n,i)=>'<pre class="wsex" data-ws="'+i+'" style="'+(i===0?"":"display:none")+'">'+esc(sn[n])+"</pre>").join("");
+    return "<h4>Kode contoh</h4><div class='codewrap'><div class='codetabs'>"+tabs+
+      "<button class='copy' data-copy='ws'>Salin</button></div>"+bodies+"</div>";
+  }
+  if(ep.method==="DOCS"){
+    return "<h4>Buka</h4><div class='codewrap'><pre>curl '"+state.base+"/docs'   # atau buka di browser:\n"+state.base+"/docs</pre></div>";
+  }
+  return "<h4>Kode contoh</h4><div class='codewrap'><div class='codetabs' data-ep='"+ep.id+"'>"+langTabs(ep)+
+    "<button class='copy' data-copy='lang'>Salin</button></div><pre class='langcode'>"+esc(genLang(ep,state.lang))+"</pre></div>";
+}
+function trySection(ep){
+  if(ep.special==="ws"||ep.method==="DOCS") return "";
+  return "<div class='tryout' id='try-"+ep.id+"'><h4>Coba (langsung dari browser ke Base URL)</h4>"+
+    "<div class='status' style='display:none'></div><pre class='out' style='display:none'></pre></div>";
+}
+function render(){
+  const nav=$("#nav"), main=$("#endpoints");
+  nav.innerHTML = GROUPS.map(g=>{
+    const items=g.items.map(ep=>{
+      const m=ep.method==="WS"?"WS":ep.method;
+      return "<a class='ep' href='#"+ep.id+"' data-id='"+ep.id+"' data-s='"+(ep.method+" "+ep.path+" "+(ep.desc||"")).toLowerCase()+"'>"+
+        "<span class='m "+m+"'>"+m+"</span><span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap'>"+esc(ep.path)+"</span></a>";
+    }).join("");
+    return "<div class='group' data-g='"+g.id+"'><div class='group-title'>"+esc(g.title)+"</div>"+items+"</div>";
+  }).join("");
+
+  main.innerHTML = GROUPS.map(g=>{
+    const eps=g.items.map(ep=>{
+      const m=ep.method;
+      const left =
+          "<p class='ep-desc'>"+esc(ep.desc||"")+"</p>"+
+          (ep.notes? "<div class='note'>"+ep.notes+"</div>":"")+
+          paramsTable(ep)+
+          bodySection(ep)+
+          respSection(ep);
+      const right =
+          (ep.special==="ws"||ep.method==="DOCS"? "" : "<button class='try' data-try='"+ep.id+"' style='width:100%;margin-bottom:10px'>Coba request dari browser</button>")+
+          codeSection(ep)+
+          trySection(ep);
+      return "<section class='ep-card' id='"+ep.id+"'>"+
+        "<div class='ep-head'>"+
+          "<span class='m "+m+"'>"+m+"</span>"+
+          "<span class='path'>"+esc(ep.path)+"</span>"+
+          "<span class='badge "+authClass(ep.auth)+"'>"+authLabel(ep.auth)+"</span>"+
+          (ep.special==="ws"||ep.method==="DOCS"? "<span style='margin-left:auto'></span>":"")+
+        "</div>"+
+        "<div class='ep-body'>"+
+          "<div class='ep-left'>"+left+"</div>"+
+          "<div class='ep-right'>"+right+"</div>"+
+        "</div></section>";
+    }).join("");
+    return "<h3 class='sec-title'>"+esc(g.title)+"</h3>"+eps;
+  }).join("");
+}
+
+/* ========================= EVENTS ========================= */
+function currentLangFrom(epId){
+  const wrap=document.querySelector(".codetabs[data-ep='"+epId+"']");
+  if(!wrap) return state.lang;
+  const on=wrap.querySelector("button.on");
+  return on? on.dataset.lang : state.lang;
+}
+function refreshLang(epId, lang){
+  const ep=[].concat(...GROUPS.map(g=>g.items)).find(e=>e.id===epId);
+  const card=document.getElementById(epId);
+  if(!ep||!card) return;
+  const pre=card.querySelector(".langcode");
+  if(pre) pre.textContent=genLang(ep, lang);
+  const wrap=card.querySelector(".codetabs[data-ep]");
+  if(wrap) wrap.querySelectorAll("button[data-lang]").forEach(b=>b.classList.toggle("on", b.dataset.lang===lang));
+}
+function refreshAllLangs(){
+  document.querySelectorAll(".codetabs[data-ep]").forEach(w=>{
+    const epId=w.dataset.ep;
+    w.querySelectorAll("button[data-lang]").forEach(b=>b.classList.toggle("on", b.dataset.lang===state.lang));
+    refreshLang(epId, state.lang);
+  });
+  document.querySelectorAll("#langpick button").forEach(b=>b.classList.toggle("on", b.dataset.lang===state.lang));
+}
+
+document.addEventListener("click", async (e)=>{
+  const t=e.target;
+  if(t.matches("#langpick button")){
+    state.lang=t.dataset.lang; localStorage.setItem("ttpg_lang", state.lang); refreshAllLangs(); return;
+  }
+  if(t.matches(".codetabs button[data-lang]")){
+    state.lang=t.dataset.lang; localStorage.setItem("ttpg_lang", state.lang); refreshAllLangs(); return;
+  }
+  if(t.matches(".resptabs button")){
+    const card=t.closest(".ep-body");
+    card.querySelectorAll(".resptabs button").forEach(b=>b.classList.remove("on"));
+    t.classList.add("on");
+    card.querySelectorAll(".respex").forEach(p=>p.style.display = p.dataset.r===t.dataset.r? "":"none");
+    return;
+  }
+  if(t.matches(".codetabs button[data-ws]")){
+    const card=t.closest(".ep-body");
+    card.querySelectorAll(".codetabs button[data-ws]").forEach(b=>b.classList.remove("on"));
+    t.classList.add("on");
+    card.querySelectorAll(".wsex").forEach(p=>p.style.display = p.dataset.ws===t.dataset.ws? "":"none");
+    return;
+  }
+  if(t.matches(".copy")){
+    const wrap=t.closest(".codewrap");
+    const vis=[...wrap.querySelectorAll("pre")].find(p=>p.style.display!=="none")||wrap.querySelector("pre");
+    try{ await navigator.clipboard.writeText(vis.textContent); t.textContent="Tersalin ✓"; setTimeout(()=>t.textContent="Salin",1200);}catch(_){t.textContent="Gagal";setTimeout(()=>t.textContent="Salin",1200);}
+    return;
+  }
+  if(t.matches(".try")||t.closest(".try")){
+    const id=(t.dataset.try|| t.closest(".try").dataset.try);
+    await runTry(id);
+    return;
+  }
+});
+
+async function runTry(id){
+  const ep=[].concat(...GROUPS.map(g=>g.items)).find(e=>e.id===id);
+  const box=document.getElementById("try-"+id);
+  if(!ep||!box) return;
+  const st=box.querySelector(".status"), out=box.querySelector(".out");
+  st.style.display=out.style.display="block";
+  st.className="status"; st.textContent="…";
+  const url=sampleUrlSimple(ep).replace(/<JWT>/g, state.jwt||"");
+  const headers=authHeaders(ep,true);
+  const opts={method:ep.method, headers};
+  if(ep.body && ep.method!=="GET"){ headers["Content-Type"]="application/json"; opts.body=JSON.stringify(ep.body.example); }
+  try{
+    const res=await fetch(url, opts);
+    const txt=await res.text();
+    st.textContent="HTTP "+res.status+" "+res.statusText;
+    st.className="status "+(res.ok?"ok":"err");
+    let prettyTxt=txt;
+    try{prettyTxt=JSON.stringify(JSON.parse(txt),null,2)}catch(_){}
+    out.textContent=prettyTxt.slice(0,4000)+(txt.length>4000?"\n…(dipotong)":"");
+  }catch(err){
+    st.textContent="Gagal: "+err.message+" — cek Base URL / CORS";
+    st.className="status err";
+    out.textContent="";
+  }
+}
+
+/* toolbar inputs */
+function bindInput(sel, key, after){
+  const el=$(sel);
+  el.value=state[key];
+  el.addEventListener("input", ()=>{ state[key]=el.value.trim(); localStorage.setItem("ttpg_"+(key==="base"?"base":key==="jwt"?"jwt":"apikey"), state[key]); if(after) after(); });
+}
+bindInput("#base","base", ()=>{ render(); refreshAllLangs(); });
+bindInput("#jwt","jwt");
+bindInput("#apikey","apikey");
+
+/* search */
+$("#q").addEventListener("input", (e)=>{
+  const v=e.target.value.trim().toLowerCase();
+  document.querySelectorAll("nav a.ep").forEach(a=>{
+    a.style.display = !v || a.dataset.s.includes(v) ? "":"none";
+  });
+  document.querySelectorAll("#nav .group").forEach(g=>{
+    const any=[...g.querySelectorAll("a.ep")].some(a=>a.style.display!=="none");
+    g.style.display= any? "":"none";
+  });
+});
+
+/* scrollspy */
+function initSpy(){
+  const links=[...document.querySelectorAll("nav a.ep")];
+  const io=new IntersectionObserver((ents)=>{
+    ents.forEach(en=>{
+      if(en.isIntersecting){
+        links.forEach(l=>l.classList.toggle("active", l.dataset.id===en.target.id));
+      }
+    });
+  },{rootMargin:"-20% 0px -70% 0px"});
+  document.querySelectorAll(".ep-card").forEach(s=>io.observe(s));
+}
+
+/* init */
+$("#langpick").innerHTML=LANGS.map(l=>"<button data-lang='"+l.id+"' class='"+(state.lang===l.id?"on":"")+"'>"+l.label+"</button>").join("");
+$("#selfurl").textContent=state.base+"/docs";
+render();
+initSpy();
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 #!/bin/bash
-BASE=${BASE:-http://127.0.0.1:8090}
+BASE=${BASE:-http://127.0.0.1:3080}
 PASS=0; FAIL=0
 BODY=""; CODE=""
 
@@ -143,6 +143,24 @@ req "POST purchase-source baru -> 201" POST /penginapan/purchase-sources 201 -H 
 SRC_ONLINE=$(jget .data.id)
 req "DELETE purchase-source dipakai -> 409" DELETE "/penginapan/purchase-sources/1" 409 -H "Authorization: Bearer $TOKEN"
 req "DELETE purchase-source baru -> 200" DELETE "/penginapan/purchase-sources/$SRC_ONLINE" 200 -H "Authorization: Bearer $TOKEN"
+
+echo "===== I. STRUK & QRIS ====="
+req "GET struk payment lunas (public) -> 200" GET "/penginapan/payments/$PAY_C2/receipt" 200
+case "$BODY" in
+  *"STRUK PEMBAYARAN"*"Dewi"*) PASS=$((PASS+1)); echo "PASS  struk berisi judul + nama tamu" ;;
+  *) FAIL=$((FAIL+1)); echo "FAIL  struk body=${BODY:0:220}" ;;
+esac
+req "GET struk ?autoprint=1 -> 200" GET "/penginapan/payments/$PAY_C2/receipt?autoprint=1" 200
+case "$BODY" in
+  *window.print*) PASS=$((PASS+1)); echo "PASS  script autoprint ada" ;;
+  *) FAIL=$((FAIL+1)); echo "FAIL  script autoprint hilang body=${BODY:0:220}" ;;
+esac
+req "GET struk id tak ada -> 404" GET "/penginapan/payments/999999/receipt" 404
+req "GET qris tanpa konfigurasi -> 404" GET /penginapan/qris 404 -H "Authorization: Bearer $TOKEN"
+req "GET qris tanpa token -> 401" GET /penginapan/qris 401
+req "POST config qris_payload -> 201" POST /penginapan/configs 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"key_configs":"qris_payload","value_configs":"00020101021126610014COM.GO-JEK.WWW01189360091432506719960210G1234567890303UMI51440014ID.CO.QRIS.WWW0215ID1020012345678900303UMI5204581253033605802ID5908TTPG PGN6007JAKARTA6105121106304ABCD"}'
+req "GET qris -> 200" GET /penginapan/qris 200 -H "Authorization: Bearer $TOKEN"
+ja "  payload EMV QRIS" '.data.payload | startswith("000201")'
 
 echo ""
 echo "================================"
