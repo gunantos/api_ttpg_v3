@@ -22,17 +22,19 @@ API Go (Gin) untuk gate, boardingpass, checkin mandiri, master tujuan/PO, manaje
 ## Menjalankan
 
 ```bash
-# 1. seed admin + api key (sekali saja)
-go run cmd/seed/main.go
+# 1. skema auth lokal (sekali saja; SKIP di produksi — tabel ttpg_users sudah ada di sana)
+#    (Docker test:) docker exec -i ttpg-mysql mysql -uroot -proot < migrations/mysql/004_create_ttpg_users.sql
+#    (atau ikuti scripts/testing/README.md)
 
-# 2. jalankan server (port 3080)
+# 2. jalankan server (port 3080) — set env DSN bila bukan default produksi
+#    (lokal contoh: AUTH_DSN/MAIN_DSN/PENGINAPAN_DSN/USERS_DSN → 127.0.0.1:13306, MONGO_URI → lokal)
 go run main.go
 
 # 3. buka dokumentasi interaktif di browser
 #    http://localhost:3080/docs
 ```
 
-Seed lokal `migrations/mysql/004_create_ttpg_users.sql` (DB `ttpg_users`): `admin`/`admin123` (`secret_key=dev-key-123`, `all_access=y`) dan `limited`/`limited123` (akses terbatas, dipakai test aturan endpoint). `go run cmd/seed/main.go` masih mengisi legacy `ttpg_auth` (`production_key=prod-key-123`, `development_key=dev-key-123`) — tidak dipakai auth lagi.
+Seed auth: `migrations/mysql/004_create_ttpg_users.sql` (DB `ttpg_users`) — `admin`/`admin123` (`secret_key=dev-key-123`, `all_access=y`) dan `limited`/`limited123` (akses terbatas, dipakai test aturan endpoint). `go run cmd/seed/main.go` masih mengisi legacy `ttpg_auth` (`production_key=prod-key-123`, `development_key=dev-key-123`) — tidak dipakai auth lagi.
 
 ## Akses dari Komputer Lain
 
@@ -112,10 +114,11 @@ Server sudah listen di **semua interface** (`0.0.0.0`), jadi otomatis bisa diaks
 main.go                  # entrypoint + wiring DB
 cmd/seed/                # seed admin & api key
 internal/
-  config/                # config.Load() → config.C (global)
-  db/                    # db.DB (*sql.DB), db.MongoClient, db.PenginapanDB (*gorm.DB)
+  config/                # config.Load() → config.C (global; termasuk UsersDSN)
+  db/                    # db.DB (*sql.DB), db.MongoClient, db.PenginapanDB + db.UsersDB (*gorm.DB)
+  logger/                # Info/Error/Warning
   model/                 # model.Boardingpass (scan SQL, sql.Null*)
-  models/                # GORM: User, APIKey, Tujuan, PO, BoardingDoc + 10 model penginapan
+  models/                # GORM: User, APIKey, Tujuan, PO, BoardingDoc + 10 model penginapan + users_ttpg.go (auth ttpg_users)
   pkg/response/          # format standar {success,message,data}
   response/              # GateResponse, BoardingpassResponse
   request/               # struct request (termasuk penginapan: checkin/payment/pindah)
@@ -124,6 +127,7 @@ internal/
   handler/               # gate, boardingpass, checkin_mandiri, print_boardingpass,
                          # penginapan_config, penginapan_master, penginapan_guest, penginapan_payment, penginapan_receipt, ws
   client/                # TicketClient, DamriClient
+  docs/                  # api.html + docs.go (embed halaman /docs)
   routes/routes.go       # registrasi semua route
 scripts/testing/         # smoke test lokal (248 assert) + reset DB uji + wsclient/
 migrations/mysql/        # 001_create_ttpg_auth.sql, 002_create_ttpg_penginapan.sql (baru), 003_upgrade_penginapan_v2.sql, 004_create_ttpg_users.sql (skema auth + seed lokal)
@@ -147,6 +151,18 @@ Setelah identitas valid, middleware mengecek **aturan endpoint** (bila ada baris
 
 Rute **tanpa** baris `api_url` menerima skema apa pun. Semua request dicatat **async** ke `ttpg_users.logs` (uri, method, params, ip, response_code, authorized, id_user, po_id, access_by). Gagal autentikasi → `401`; terautentikasi tapi ditolak aturan/akses/blokir → `403`.
 
+Contoh cepat:
+
+```bash
+TOKEN=$(curl -s -X POST localhost:3080/auth/login -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin123"}' | jq -r .data.token)
+
+curl -s localhost:3080/tujuan -H "Authorization: Bearer $TOKEN"   # JWT
+curl -s localhost:3080/tujuan -H 'X-ttpg-key: dev-key-123'        # API key user (secret_key)
+curl -s localhost:3080/tujuan -H 'X-ttpg-key: 12345'              # superkey env API_KEY
+curl -s localhost:3080/tujuan -u admin:admin123                   # Basic
+```
+
 Tanpa auth: `/auth/login`, `/auth/key`, `/boarding/print/:code` (alias lama: `/boardingpass/print/:code`), `/penginapan/payments/:id/receipt` (struk), `/ws` (JWT via query `?token=`), `/docs`.
 
 ## Verifikasi
@@ -159,8 +175,10 @@ go vet ./...
 Smoke test end-to-end (Docker MySQL+Mongo lokal, 248 assert) ada di [`scripts/testing/`](scripts/testing/README.md):
 
 ```bash
-cd scripts/testing && ./reset.sh && ./test_api.sh && ./test_env_flags.sh && ./test_penginapan.sh && ./test_ws.sh
+cd scripts/testing && ./reset.sh && ./test_api.sh && ./test_env_flags.sh && ./test_penginapan.sh && ./reset.sh && ./test_ws.sh
 ```
+
+(Reset di tengah wajib — `test_ws.sh` butuh state bersih; lihat `scripts/testing/README.md`.)
 
 ## Dokumentasi
 

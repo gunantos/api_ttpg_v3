@@ -156,13 +156,13 @@ Response `200`:
   "data": {
     "username": "admin",
     "po_id": "PO001",
-    "production_key": "prod-key-123",
+    "public_key": "pub-admin-123",
     "development_key": "dev-key-123"
   }
 }
 ```
 
-`401` — `{"status": false, "data": null, "message": "…"}` + header `WWW-Authenticate`.
+`po_id` = `user.po_id` pertama (bila kosong → `null`). `401` — `{"status": false, "data": null, "message": "…"}` + header `WWW-Authenticate: Basic realm="ttpg"`. Skema lain (Bearer/API key) ditolak — endpoint ini khusus Basic.
 
 ---
 
@@ -170,7 +170,7 @@ Response `200`:
 
 ### POST `/gate`
 
-Header: API key literal. Body:
+Auth seragam†. Body:
 
 ```json
 { "noreg": "ABC123", "gate_id": 1 }
@@ -210,7 +210,7 @@ Query: tidak ada — `gate_id` dari body.
 
 ### POST `/checkin-mandiri`
 
-Header: API key literal. Body (JSON atau form):
+Auth seragam†. Body (JSON atau form):
 
 ```json
 { "ticket_id": "TKT-001" }
@@ -248,7 +248,7 @@ Alur: cari di Mongo `boarding` (`status=active`, `user_id` tidak di `IgnoredMong
 
 ### GET `/boardingpass` (list)
 
-Header: API key literal. Query (opsional): `noreg` (LIKE), `id_po`, `fungsi`, `id_tujuan` (int), `limit` (1–1000, default 100), `offset` (default 0). Hanya baris `deleted IS NULL`, urut `id DESC`.
+Auth seragam†. Query (opsional): `noreg` (LIKE), `id_po`, `fungsi`, `id_tujuan` (int), `limit` (1–1000, default 100), `offset` (default 0). Hanya baris `deleted IS NULL`, urut `id DESC`.
 
 `200`:
 
@@ -268,7 +268,7 @@ Header: API key literal. Query (opsional): `noreg` (LIKE), `id_po`, `fungsi`, `i
 
 ### GET `/boardingpass/:id`
 
-Header: API key literal. Response `200` = objek `model.Boardingpass` apa adanya:
+Auth seragam†. Response `200` = objek `model.Boardingpass` apa adanya:
 
 ```json
 {
@@ -289,7 +289,7 @@ Header: API key literal. Response `200` = objek `model.Boardingpass` apa adanya:
 
 ### POST `/boardingpass`
 
-Header: API key literal. Body:
+Auth seragam†. Body:
 
 ```json
 {
@@ -319,7 +319,7 @@ Respons:
 
 ### PUT `/boardingpass/:id`
 
-Header: API key literal. Body — semua field opsional, hanya yang dikirim yang di-update:
+Auth seragam†. Body — semua field opsional, hanya yang dikirim yang di-update:
 
 ```json
 {"fungsi": "gateout", "gate_id": "1", "device_id": "DEV1", "time_tab": "2026-01-02 10:20:30", "count_scan": 3}
@@ -333,7 +333,7 @@ Respons: `200` = objek boardingpass terbaru (format sama dengan `GET /boardingpa
 
 ### DELETE `/boardingpass/:id`
 
-Header: API key literal. Soft delete (`deleted = NOW()`, baris tetap ada tapi disembunyikan dari GET/list).
+Auth seragam†. Soft delete (`deleted = NOW()`, baris tetap ada tapi disembunyikan dari GET/list).
 
 - `200` `{"message": "boardingpass berhasil dihapus"}`
 - `404` `{"error": "boardingpass tidak ditemukan"}` (tidak ada atau sudah terhapus)
@@ -386,7 +386,7 @@ Auth seragam (JWT / Basic / API key — lihat [Autentikasi](#autentikasi)). Hany
 
 Auth seragam (JWT / Basic / API key — lihat [Autentikasi](#autentikasi)). Koleksi `boarding` (db `ttpg`).
 
-Aturan `po_id` user: `users.po_ids` disimpan sebagai string dipisah koma → di-parse `[]string`.
+Aturan `po_id` user: `ttpg_users.user.po_id` disimpan sebagai string dipisah koma (atau `;`) → di-parse `[]string`; nilai dibaca segar dari DB per request (JWT cukup sebagai bukti login).
 
 - 0 po_id → bebas semua PO
 - 1 po_id → auto-fill `po_id` saat POST, filter otomatis saat GET

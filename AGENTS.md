@@ -15,7 +15,7 @@ Smoke test end-to-end (Docker MySQL+Mongo lokal, 248 assert) ada di `scripts/tes
 
 - Module: `github.com/andtho89/ttpg`, Go (lihat `go.mod`)
 - Server berjalan: `go run main.go` (port default `3080`)
-- Seed awal: `go run cmd/seed/main.go`
+- Seed auth: `migrations/mysql/004_create_ttpg_users.sql` (lokal saja; produksi sudah punya `ttpg_users`). `go run cmd/seed/main.go` = legacy `ttpg_auth`, tidak dipakai auth.
 - **Server WAJIB dapat keempat-nya**: `AUTH_DSN`, `MAIN_DSN`, `PENGINAPAN_DSN`, **`USERS_DSN`** (auth — default menunjuk DB produksi `ttpg_users`; jika DB/user ditolak → `log.Fatalf`). Untuk test lokal Docker: semua DSN → `127.0.0.1:13306` (lihat `scripts/testing/test_env_flags.sh` `restart()` / `run_server.sh`).
 - **Auth membaca `ttpg_users`** (env `USERS_DSN`): login/JWT/API key/Basic dari tabel `user`; aturan endpoint dari `api_url` + `access`/`allowed`; request dicatat async ke `logs`. Tabel `ttpg_auth.users`/`api_keys` **tidak dipakai auth lagi** (masih di-seed legacy).
 - **Sandbox TIDAK bisa mencapai `192.168.1.3:3306` (MySQL) dan `27017` (Mongo)** — test runtime harus dijalankan di mesin user atau Docker lokal. Jangan mengubah default DSN/URI hanya karena koneksi gagal di sandbox.
@@ -58,7 +58,7 @@ migrations/mysql/            # 001_create_ttpg_auth.sql, 002_create_ttpg_pengina
 - Akses DB:
   - Query mentah `db.DB` (*sql.DB) untuk `terminal_boardingpass` dan `tbl_tujuan`.
   - GORM via `mainDB` (parameter `routes.RegisterRoutes`) untuk `tbl_po`, `/tujuan`.
-  - `auth.AuthDB` (GORM) untuk `users`/`api_keys`.
+  - `auth.AuthDB` (GORM) untuk `users`/`api_keys` — **legacy saja**; auth memakai `auth.UsersDB` (`ttpg_users`: user/access/api_url/logs).
   - `db.MongoClient.Database(config.C.MongoDatabase).Collection(...)` untuk Mongo.
   - `db.PenginapanDB` (GORM, env `PENGINAPAN_DSN`) untuk semua tabel penginapan; model + AutoMigrate ada di `main.go`.
 - Kolom nullable di-`scan` ke field `sql.Null*` pada `model.Boardingpass` (**bukan** pointer) — scan ke `**T` akan error.
@@ -93,7 +93,7 @@ Di `internal/routes/routes.go`:
 - **Gate** (`handler/gate.go`): fallback ke API tiket eksternal bila noreg tidak ada (insert `PO122`, `fungsi=gatein`); max 5 scan; rescan kedaluwarsa > 5 menit; `BYPASS=true` → selalu lolos; `LIST_ID_CARD` (env, dipisah koma) → selalu lolos.
 - **Checkin mandiri** (`handler/checkin_mandiri.go`): cari di Mongo (`status=active`), jika kosong dan `ENABLE_DAMRI_FALLBACK=true` baru coba Damri; rollback Mongo bila MySQL gagal; noreg = `"CM" + hex(16 byte)`; PO `PO028` = Damri; `print_url` memakai `/boarding/print/<noreg>` (bukan `/boardingpass/print`).
 - **Boarding (Mongo `ttpg.boarding`)**: `destination_id` campur tipe di produksi — int (967k), string `"395"` (260k), object `{id_tujuan: 395, …}` (8,5k), 1 missing → **wajib** `models.FlexInt` (`bson.ValueUnmarshaler`) di `BoardingDoc`/`mongoBoarding`; decode default (int saja) membuat `GET /boarding` 500. Filter `GET /boarding?destination_id=` memakai `$or` [int, string, `destination_id.id_tujuan`]. `GET /boarding` **wajib paginasi** `limit` (1-1000, default 100) + `offset` + `pagination` — tanpa limit handler memuat 1,2M dokumen ke memori (timeout/OOM di produksi).
-- **po_id user**: disimpan sebagai string dipisah koma di `users.po_ids`, di-parse jadi `[]string`; 1 po_id → auto-fill; 0 → bebas.
+- **po_id user**: disimpan sebagai string dipisah koma di `ttpg_users.user.po_id`, di-parse jadi `[]string` (dibaca segar per request); 1 po_id → auto-fill; 0 → bebas.
 - **Penginapan** (`handler/penginapan_*.go`, DB `ttpg_penginapan`):
   - Lunas = Σ alokasi dari payment `status='lunas'` ≥ `harga` tamu; `pending` tidak dihitung.
   - 1 payment bisa menutup banyak tamu: wajib `allocations` (total = `amount`); 1 tamu → alokasi otomatis.

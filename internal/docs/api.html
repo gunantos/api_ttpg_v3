@@ -228,7 +228,7 @@ const GROUPS = [
     {code:401, label:"Salah", example:{success:false, message:"Username atau password salah", errors:null}}]},
  {id:"authkey", method:"GET", path:"/auth/key", auth:"basic", desc:"Ambil API key user (Basic auth). Shape khusus: {status, data, message}.",
   responses:[
-    {code:200, label:"OK", example:{status:true, data:{username:"admin", po_id:"PO001", production_key:"prod-key-123", development_key:"dev-key-123"}, message:""}},
+    {code:200, label:"OK", example:{status:true, data:{username:"admin", po_id:"PO001", public_key:"pub-admin-123", development_key:"dev-key-123"}, message:""}},
     {code:401, label:"Unauthorized", example:{status:false, data:null, message:"unauthorized"}}]}
 ]},
 {id:"gate", title:"Gate & Checkin Mandiri", items:[
