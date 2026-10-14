@@ -163,8 +163,8 @@
         <input id="base" spellcheck="false">
       </div>
       <div class="f">
-        <label>JWT token (untuk /auth/login → endpoint JWT &amp; “Coba”)</label>
-        <input id="jwt" type="password" spellcheck="false" placeholder="tempel token dari POST /auth/login">
+        <label>JWT token (untuk POST /auth → endpoint JWT &amp; “Coba”)</label>
+        <input id="jwt" type="password" spellcheck="false" placeholder="tempel token dari POST /auth">
       </div>
       <div class="f" style="flex:0 1 150px">
         <label>API key literal</label>
@@ -183,15 +183,15 @@
     <h3>Ringkasan Auth</h3>
     <table>
       <tr><th>Cara</th><th>Header</th><th>Dipakai untuk</th></tr>
-      <tr><td>Tanpa auth</td><td>—</td><td><code>/auth/login</code>, <code>/auth/key</code>, <code>/boarding/print/:code</code>, <code>/penginapan/payments/:id/receipt</code>, <code>/ws</code>, <code>/docs</code></td></tr>
-      <tr><td>JWT</td><td><code>Authorization: Bearer &lt;token&gt;</code></td><td>semua route protected — token dari <code>/auth/login</code>, berlaku 1 minggu</td></tr>
+      <tr><td>Tanpa auth</td><td>—</td><td><code>POST /auth</code>, <code>/boarding/print/:code</code>, <code>/penginapan/payments/:id/receipt</code>, <code>/ws</code>, <code>/docs</code></td></tr>
+      <tr><td>JWT</td><td><code>Authorization: Bearer &lt;token&gt;</code></td><td>semua route protected — token dari <code>POST /auth</code>, berlaku 1 minggu</td></tr>
       <tr><td>Basic</td><td><code>Authorization: Basic base64(user:pass)</code></td><td>semua route protected — user aktif di <code>ttpg_users.user</code> (bcrypt)</td></tr>
       <tr><td>API key user</td><td><code>X-ttpg-key: dev-key-123</code> atau <code>X-API-Key</code></td><td>semua route protected — cocok <code>user.secret_key</code> di <code>ttpg_users</code></td></tr>
       <tr><td>API key literal</td><td><code>X-ttpg-key: 12345</code> atau <code>X-API-Key</code></td><td>semua route protected — cocok literal dengan env <code>API_KEY</code> (superkey, <code>user_id=0</code>)</td></tr>
     </table>
     <div class="note">Satu middleware seragam (<code>auth.AuthMiddleware</code>): header API key (literal env <code>API_KEY</code> dulu, baru <code>user.secret_key</code>) → <code>Authorization</code> (Bearer/Basic). Digest dilepas. Lalu aturan endpoint dari tabel <code>api_url</code>/<code>access</code> (skema wajib + izin) — ditolak → 403. Gagal auth → 401 + <code>WWW-Authenticate</code> (Basic). Semua request dicatat async ke <code>logs</code>.</div>
     <h3>Format response</h3>
-    <p style="color:var(--muted);margin:6px 0"><b>A. Standar</b> — <code>/auth/login</code>, <code>/tujuan</code>, <code>/po</code>, <code>/boarding*</code>, seluruh <code>/penginapan/*</code>:</p>
+    <p style="color:var(--muted);margin:6px 0"><b>A. Standar</b> — <code>POST /auth</code>, <code>/tujuan</code>, <code>/po</code>, <code>/boarding*</code>, seluruh <code>/penginapan/*</code>:</p>
     <pre>{
   "success": true,
   "message": "…",
@@ -219,17 +219,13 @@ const SAMPLE = {id:"1", key:"nama_hotel", code:"ABC123"};
 
 const GROUPS = [
 {id:"auth", title:"Autentikasi", items:[
- {id:"login", method:"POST", path:"/auth/login", auth:"none", desc:"Login dengan username/password → JWT (berlaku 1 minggu) + info user.",
+ {id:"login", method:"POST", path:"/auth", auth:"none", desc:"Login dengan username/password → JWT (berlaku 1 minggu) + info user.",
   body:{example:{username:"admin", password:"admin123"}, fields:[
     {name:"username", type:"string", req:true, desc:"username user"},
     {name:"password", type:"string", req:true, desc:"password user"}]},
   responses:[
     {code:200, label:"OK", example:{success:true, message:"Login berhasil", data:{token:"<jwt>", user_id:1, role:"admin", expire:"2026-10-21T10:00:00+07:00"}}},
     {code:401, label:"Salah", example:{success:false, message:"Username atau password salah", errors:null}}]},
- {id:"authkey", method:"GET", path:"/auth/key", auth:"basic", desc:"Ambil API key user (Basic auth). Shape khusus: {status, data, message}.",
-  responses:[
-    {code:200, label:"OK", example:{status:true, data:{username:"admin", po_id:"PO001", public_key:"pub-admin-123", development_key:"dev-key-123"}, message:""}},
-    {code:401, label:"Unauthorized", example:{status:false, data:null, message:"unauthorized"}}]}
 ]},
 {id:"gate", title:"Gate & Checkin Mandiri", items:[
  {id:"gate", method:"POST", path:"/gate", auth:"apikey", desc:"Scan gate. Cari boardingpass by noreg; fallback ke API tiket eksternal bila tidak ada lokal. Maks 5 scan; rescan kedaluwarsa 5 menit.",
@@ -506,7 +502,7 @@ const GROUPS = [
 {id:"ws", title:"WebSocket", items:[
  {id:"ws", method:"WS", path:"/ws", auth:"query", special:"ws",
   desc:"Real-time event penginapan. Route public — JWT dikirim sebagai query ?token= (401 sebelum upgrade bila kosong/salah). Client hanya menerima push (ping/pong otomatis ±54 detik).",
-  params:[{name:"token", in:"query", type:"string", req:true, desc:"JWT dari /auth/login"}],
+  params:[{name:"token", in:"query", type:"string", req:true, desc:"JWT dari POST /auth"}],
   responses:[
     {code:101, label:"Switching Protocols", example:"(upgrade WebSocket berhasil — tidak ada body HTTP)"},
     {code:401, label:"Tanpa token", example:{message:"unauthorized"}}]},

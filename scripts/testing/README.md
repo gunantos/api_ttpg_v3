@@ -49,14 +49,14 @@ MONGO_URI='mongodb://127.0.0.1:27017' ./ttpg_server &
 | Skrip | Fungsi |
 |-------|--------|
 | `reset.sh` | Reset data uji (schema + seed Mongo + row GATE002 + po_ids kosong + re-migrasi `ttpg_penginapan`) |
-| `test_api.sh` | 142 assert: auth (JWT/Basic/API key seragam via `ttpg_users`), aturan endpoint (`api_url` wajib Bearer → 403, akses `access.id_api` → 403, blokir user → 403, logs tercatat), boarding Mongo list (paginasi + filter `destination_id`), docs interaktif `/docs`, gate (valid/rescan/max/expired/fallback + scan via JWT/Basic), boardingpass (CRUD: list/update/delete + get/print + secret_key), checkin mandiri, boarding Mongo CRUD, restriksi po_id |
+| `test_api.sh` | 139 assert: auth (JWT/Basic/API key seragam via `ttpg_users`), aturan endpoint (`api_url` wajib Bearer → 403, akses `access.id_api` → 403, blokir user → 403, logs tercatat), boarding Mongo list (paginasi + filter `destination_id`), docs interaktif `/docs`, gate (valid/rescan/max/expired/fallback + scan via JWT/Basic), boardingpass (CRUD: list/update/delete + get/print + secret_key), checkin mandiri, boarding Mongo CRUD, restriksi po_id |
 | `test_env_flags.sh` | 5 assert: `BYPASS=true`, `LIST_ID_CARD`, kembali normal (restart server) |
 | `test_penginapan.sh` | 87 assert: configs/lookups, master lokasi/kamar/layout, check-in (lunas/pending/alokasi/kapasitas/maintenance), summary lunas, payment manual/void, checkout, pindah kamar, histories, guard delete, struk pembayaran (public + autoprint + 404), QRIS (404 belum dikonfigurasi → config → 200 payload) |
 | `test_ws.sh` | 14 assert: auth `/ws` (401 tanpa/salah token), koneksi client, event `room` (status change), event `occupancy` + `guest` (check-in) — build test client otomatis dari `wsclient/` |
 
 ```bash
 ./reset.sh
-./test_api.sh         # ekspektasi: TOTAL: PASS=142 FAIL=0
+./test_api.sh         # ekspektasi: TOTAL: PASS=139 FAIL=0
 ./test_env_flags.sh   # ekspektasi: TOTAL: PASS=5 FAIL=0
 ./reset.sh && ./test_penginapan.sh   # ekspektasi: TOTAL: PASS=87 FAIL=0
 ./reset.sh && ./test_ws.sh           # ekspektasi: TOTAL: PASS=14 FAIL=0

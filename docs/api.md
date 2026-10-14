@@ -26,8 +26,7 @@ Sumber kebenaran route: `internal/routes/routes.go`. **Update file ini setiap ad
 | POST | `/boardingpass` | Seragam† |
 | PUT | `/boardingpass/:id` | Seragam† |
 | DELETE | `/boardingpass/:id` | Seragam† |
-| POST | `/auth/login` | Tanpa auth |
-| GET | `/auth/key` | Basic |
+| POST | `/auth` | Tanpa auth |
 | GET | `/tujuan` | Seragam† |
 | GET | `/po` | Seragam† |
 | GET | `/boarding` | Seragam† |
@@ -60,7 +59,7 @@ Total 43 endpoint penginapan: 42 di group `/penginapan` + 1 public (`GET /pengin
 |-------|--------|---------|
 | API key (DB `ttpg_users`) | `X-ttpg-key: dev-key-123` atau `X-API-Key: …` | cocok `user.secret_key` (user aktif; user_id/role/po_ids dari baris `user` tersebut) |
 | API key literal | `X-ttpg-key: 12345` atau `X-API-Key: 12345` | cocok literal dengan env `API_KEY` (default `12345`) — berlaku sebagai superkey; konteks `user_id=0`, `role=api_key` |
-| JWT | `Authorization: Bearer <token>` | token dari `/auth/login`, berlaku 1 minggu |
+| JWT | `Authorization: Bearer <token>` | token dari `POST /auth`, berlaku 1 minggu |
 | Basic | `Authorization: Basic base64(username:password)` | user aktif di `ttpg_users.user` (bcrypt PHP `$2y$` kompatibel) |
 
 Digest **dilepas** (tabel `user` di `ttpg_users` tidak punya kolom HA1); skema tak dikenal → `401`.
@@ -86,7 +85,7 @@ Rute **tanpa** baris `api_url` menerima skema apa pun (aturan hanya berlaku bila
 
 Setiap request (termasuk yang gagal) dicatat **async** ke `ttpg_users.logs`: `uri`, `method`, `params` (query string), `api_key`, `ip_address`, `time`, `rtime`, `authorized` (`y`/`n`), `response_code`, `id_user`, `po_id`, `access_by` (skema), `date`.
 
-Endpoint **public** (tanpa auth): `/auth/login`, `/auth/key` (menjalankan Basic-nya sendiri), `/boarding/print/:code` (+alias), `/penginapan/payments/:id/receipt`, `/ws` (JWT via query `?token=`), `/docs`.
+Endpoint **public** (tanpa auth): `POST /auth`, `/boarding/print/:code` (+alias), `/penginapan/payments/:id/receipt`, `/ws` (JWT via query `?token=`), `/docs`.
 
 ---
 
@@ -94,7 +93,7 @@ Endpoint **public** (tanpa auth): `/auth/login`, `/auth/key` (menjalankan Basic-
 
 Dua format, tergantung endpoint:
 
-**A. Format standar** (`internal/pkg/response`) — untuk `/auth/login`, `/tujuan`, `/po`, `/boarding*`, **seluruh `/penginapan/*`**:
+**A. Format standar** (`internal/pkg/response`) — untuk `POST /auth`, `/tujuan`, `/po`, `/boarding*`, **seluruh `/penginapan/*`**:
 
 ```json
 {
@@ -121,7 +120,7 @@ Error:
 
 ## Auth
 
-### POST `/auth/login`
+### POST `/auth`
 
 Request:
 
@@ -146,23 +145,7 @@ Response `200`:
 
 `401` — username/password salah (format error standar).
 
-### GET `/auth/key`
-
-Response `200`:
-
-```json
-{
-  "status": true,
-  "data": {
-    "username": "admin",
-    "po_id": "PO001",
-    "public_key": "pub-admin-123",
-    "development_key": "dev-key-123"
-  }
-}
-```
-
-`po_id` = `user.po_id` pertama (bila kosong → `null`). `401` — `{"status": false, "data": null, "message": "…"}` + header `WWW-Authenticate: Basic realm="ttpg"`. Skema lain (Bearer/API key) ditolak — endpoint ini khusus Basic.
+> **Perubahan route**: login sebelumnya `POST /auth/login` — sekarang hanya **`POST /auth`** (path lama → `404`). `GET /auth/key` **dihapus**; API key = kolom `user.secret_key` (lihat [Autentikasi](#autentikasi)).
 
 ---
 
@@ -585,7 +568,7 @@ Check-in + pembayaran + struk/QRIS dapat diselesaikan dengan sedikit request:
 
 ### GET `/ws?token=<JWT>`
 
-Endpoint public untuk real-time update penginapan. Token JWT (hasil login `/auth/login`) dikirim sebagai query parameter; tanpa token atau token salah → `401` (respons HTTP sebelum upgrade). Client menerima push event setelah perubahan data di-commit; client tidak perlu mengirim pesan (ping/pong otomatis, ping tiap ±54 detik).
+Endpoint public untuk real-time update penginapan. Token JWT (hasil login `POST /auth`) dikirim sebagai query parameter; tanpa token atau token salah → `401` (respons HTTP sebelum upgrade). Client menerima push event setelah perubahan data di-commit; client tidak perlu mengirim pesan (ping/pong otomatis, ping tiap ±54 detik).
 
 Format pesan (server → client):
 

@@ -4,7 +4,7 @@ API Go (Gin) untuk gate, boardingpass, checkin mandiri, master tujuan/PO, manaje
 
 ## Fitur
 
-- **Auth**: seragam di semua route protected — JWT (Bearer), Basic, API key (`user.secret_key` di DB `ttpg_users` atau literal env `API_KEY`); aturan skema+izin per endpoint dari `api_url`/`access`, log async ke `logs`
+- **Auth**: login `POST /auth` → JWT (berlaku 1 minggu); seragam di semua route protected — JWT (Bearer), Basic, API key (`user.secret_key` di DB `ttpg_users` atau literal env `API_KEY`); aturan skema+izin per endpoint dari `api_url`/`access`, log async ke `logs`
 - **Gate**: scan noreg, fallback ke API tiket eksternal, aturan max 5 scan & expired 5 menit
 - **Checkin mandiri**: dari MongoDB `boarding`, opsional fallback Damri, auto-generate noreg `CM…`
 - **Boardingpass**: list (filter+limit/offset), create/get, update/delete (soft), print (cetak HTML + QR)
@@ -69,13 +69,13 @@ Server sudah listen di **semua interface** (`0.0.0.0`), jadi otomatis bisa diaks
 3. **Akses dari komputer lain**:
 
    ```
-   http://192.168.1.50:3080/auth/login
+   http://192.168.1.50:3080/auth
    ```
 
    Verifikasi cepat dari komputer lain:
 
    ```bash
-   curl -X POST http://192.168.1.50:3080/auth/login \
+   curl -X POST http://192.168.1.50:3080/auth \
         -H "Content-Type: application/json" \
         -d '{"username":"admin","password":"admin123"}'
    ```
@@ -112,7 +112,7 @@ Server sudah listen di **semua interface** (`0.0.0.0`), jadi otomatis bisa diaks
 
 ```
 main.go                  # entrypoint + wiring DB
-cmd/seed/                # seed admin & api key
+cmd/seed/                # seed legacy admin+api key (tttg_auth; tidak dipakai auth)
 internal/
   config/                # config.Load() → config.C (global; termasuk UsersDSN)
   db/                    # db.DB (*sql.DB), db.MongoClient, db.PenginapanDB + db.UsersDB (*gorm.DB)
@@ -129,7 +129,7 @@ internal/
   client/                # TicketClient, DamriClient
   docs/                  # api.html + docs.go (embed halaman /docs)
   routes/routes.go       # registrasi semua route
-scripts/testing/         # smoke test lokal (248 assert) + reset DB uji + wsclient/
+scripts/testing/         # smoke test lokal (245 assert) + reset DB uji + wsclient/
 migrations/mysql/        # 001_create_ttpg_auth.sql, 002_create_ttpg_penginapan.sql (baru), 003_upgrade_penginapan_v2.sql, 004_create_ttpg_users.sql (skema auth + seed lokal)
 docs/api.md              # dokumentasi API lengkap
 ```
@@ -139,10 +139,12 @@ docs/api.md              # dokumentasi API lengkap
 Semua route protected (gate, checkin-mandiri, boardingpass, tujuan, po, boarding, penginapan) memakai **satu middleware seragam** (`auth.AuthMiddleware`) — detail di [`docs/api.md`](docs/api.md):
 
 1. **API key** — `X-ttpg-key` / `X-API-Key`: **literal** env `API_KEY` (superkey, `user_id=0`) atau `user.secret_key` di `ttpg_users` (user aktif)
-2. **JWT** — `Authorization: Bearer <token>` (dari `/auth/login`, berlaku 1 minggu; user dimuat ulang dari `ttpg_users`)
+2. **JWT** — `Authorization: Bearer <token>` (dari `POST /auth`, berlaku 1 minggu; user dimuat ulang dari `ttpg_users`)
 3. **Basic** — `Authorization: Basic base64(username:password)` (bcrypt `ttpg_users.user`)
 
 Digest **dilepas** (tabel `ttpg_users` tidak punya kolom HA1) — skema tak dikenal → `401` + `WWW-Authenticate: Basic realm="ttpg"`.
+
+> **Catatan pembaruan route auth**: login hanya `POST /auth` — path lama `POST /auth/login` dihapus (404), dan `GET /auth/key` sudah dihapus; API key didapat dari kolom `user.secret_key` (superkey: env `API_KEY`).
 
 Setelah identitas valid, middleware mengecek **aturan endpoint** (bila ada baris `api_url` yang cocok method+path; controller ternormalisasi, `/x/index` == `/x`):
 - **skema wajib** baris `api_url.authorization` (`api_key`/`bearer_token`/`basic_auth`/`none`) → salah → `403`;
@@ -154,7 +156,7 @@ Rute **tanpa** baris `api_url` menerima skema apa pun. Semua request dicatat **a
 Contoh cepat:
 
 ```bash
-TOKEN=$(curl -s -X POST localhost:3080/auth/login -H 'Content-Type: application/json' \
+TOKEN=$(curl -s -X POST localhost:3080/auth -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"admin123"}' | jq -r .data.token)
 
 curl -s localhost:3080/tujuan -H "Authorization: Bearer $TOKEN"   # JWT
@@ -163,7 +165,7 @@ curl -s localhost:3080/tujuan -H 'X-ttpg-key: 12345'              # superkey env
 curl -s localhost:3080/tujuan -u admin:admin123                   # Basic
 ```
 
-Tanpa auth: `/auth/login`, `/auth/key`, `/boarding/print/:code` (alias lama: `/boardingpass/print/:code`), `/penginapan/payments/:id/receipt` (struk), `/ws` (JWT via query `?token=`), `/docs`.
+Tanpa auth: `POST /auth`, `/boarding/print/:code` (alias lama: `/boardingpass/print/:code`), `/penginapan/payments/:id/receipt` (struk), `/ws` (JWT via query `?token=`), `/docs`.
 
 ## Verifikasi
 
@@ -172,7 +174,7 @@ go build ./...
 go vet ./...
 ```
 
-Smoke test end-to-end (Docker MySQL+Mongo lokal, 248 assert) ada di [`scripts/testing/`](scripts/testing/README.md):
+Smoke test end-to-end (Docker MySQL+Mongo lokal, 245 assert) ada di [`scripts/testing/`](scripts/testing/README.md):
 
 ```bash
 cd scripts/testing && ./reset.sh && ./test_api.sh && ./test_env_flags.sh && ./test_penginapan.sh && ./reset.sh && ./test_ws.sh

@@ -9,7 +9,7 @@ go build ./...
 go vet ./...
 ```
 
-Smoke test end-to-end (Docker MySQL+Mongo lokal, 248 assert) ada di `scripts/testing/` — jalankan `reset.sh`, `test_api.sh`, `test_env_flags.sh`, `test_penginapan.sh`, `test_ws.sh` (lihat `scripts/testing/README.md`). Jangan jalankan skrip test terhadap DB produksi (`192.168.1.3`).
+Smoke test end-to-end (Docker MySQL+Mongo lokal, 245 assert) ada di `scripts/testing/` — jalankan `reset.sh`, `test_api.sh`, `test_env_flags.sh`, `test_penginapan.sh`, `test_ws.sh` (lihat `scripts/testing/README.md`). Jangan jalankan skrip test terhadap DB produksi (`192.168.1.3`).
 
 ## Lingkungan
 
@@ -52,9 +52,8 @@ migrations/mysql/            # 001_create_ttpg_auth.sql, 002_create_ttpg_pengina
 
 - Framework HTTP: **Gin**. Handler bernama `func(c *gin.Context)` di `internal/handler/` atau closure di `routes.go`.
 - **Dua format response, jangan disamakan:**
-  1. `internal/pkg/response` (`response.Success` / `response.Error`) → untuk `/auth/login`, `/tujuan`, `/po`, `/boarding*`, **seluruh `/penginapan/*`**. Shape: `{success, message, data, pagination?, errors?}`. (Satu-satunya pengecualian 200 OK: `GET /penginapan/payments/:id/receipt` mengembalikan HTML struk; error-nya tetap format standar.)
+  1. `internal/pkg/response` (`response.Success` / `response.Error`) → untuk `POST /auth`, `/tujuan`, `/po`, `/boarding*`, **seluruh `/penginapan/*`**. Shape: `{success, message, data, pagination?, errors?}`. (Satu-satunya pengecualian 200 OK: `GET /penginapan/payments/:id/receipt` mengembalikan HTML struk; error-nya tetap format standar.)
   2. Format mentah handler gate/boardingpass/checkin (`gin.H` atau struct `internal/response`) → untuk `/gate`, `/checkin-mandiri`, `/boardingpass*`, `/boarding/print`. Jangan dibungkus format standar.
-  3. `/auth/key` memakai shape sendiri: `{status, data, message}`.
 - Akses DB:
   - Query mentah `db.DB` (*sql.DB) untuk `terminal_boardingpass` dan `tbl_tujuan`.
   - GORM via `mainDB` (parameter `routes.RegisterRoutes`) untuk `tbl_po`, `/tujuan`.
@@ -77,7 +76,7 @@ Di `internal/routes/routes.go`:
 3. `GET /docs` — **public**; halaman dokumentasi interaktif (embed `internal/docs/api.html`; update juga `docs/api.md` bila endpoint berubah).
 4. `GET /penginapan/payments/:id/receipt` — **public, tanpa auth** (struk HTML 78mm; dibuka via `window.open`/`?autoprint=1` seperti `/boarding/print`, jadi tidak boleh masuk group JWT).
 5. Group `auth.AuthMiddleware()` (seragam — satunya middleware untuk semua route protected; ganti `middleware.ApiKeyAuth` lama): `POST /gate`, `POST /checkin-mandiri`, `GET /boardingpass` (list), `GET/POST /boardingpass`, `GET/PUT/DELETE /boardingpass/:id`.
-6. `POST /auth/login`, `GET /auth/key`.
+6. `POST /auth` (login → JWT; `GET /auth/key` sudah DIHAPUS).
 7. Group `auth.AuthMiddleware()` — `GET /tujuan`, `GET /po`, `GET/POST/PUT/DELETE /boarding*`.
 8. Group `peng := r.Group("/penginapan")` + `auth.AuthMiddleware()` — configs, **`GET /qris`**, payment-methods, purchase-sources, locations, rooms (+`PUT /rooms/:id/status`), room-layouts, guests (+`/guests/:id/checkout`, `/guests/:id/pindah`, `/guests/:id/histories`), payments, room-histories.
 
@@ -109,4 +108,4 @@ Di `internal/routes/routes.go`:
 
 ## Pekerjaan belum selesai (lanjutkan bila diminta)
 
-- Test runtime sudah dilakukan via `scripts/testing/` (248 assert: 142 API + 5 env-flag + 87 penginapan + 14 WS, Docker lokal) terhadap semua endpoint yang ada; sisa yang belum teruji: jalur sukses fallback API tiket & Damri (butuh akses jaringan keluar).
+- Test runtime sudah dilakukan via `scripts/testing/` (245 assert: 139 API + 5 env-flag + 87 penginapan + 14 WS, Docker lokal) terhadap semua endpoint yang ada; sisa yang belum teruji: jalur sukses fallback API tiket & Damri (butuh akses jaringan keluar).
