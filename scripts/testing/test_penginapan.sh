@@ -162,6 +162,132 @@ req "POST config qris_payload -> 201" POST /penginapan/configs 201 -H "Authoriza
 req "GET qris -> 200" GET /penginapan/qris 200 -H "Authorization: Bearer $TOKEN"
 ja "  payload EMV QRIS" '.data.payload | startswith("000201")'
 
+echo "===== J. PAYMENT GATEWAY (midtrans & xendit) ====="
+req "GET payment-gateway belum diset -> 200" GET /penginapan/payment-gateway 200 -H "Authorization: Bearer $TOKEN"
+ja "  configured=false" '.data.configured == false'
+
+req "POST payment pending (gateway) -> 201" POST /penginapan/payments 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"amount\":75000,\"payment_method_id\":$CASH_ID,\"source_id\":1,\"status\":\"pending\",\"guest_ids\":[$GX]}"
+PG1=$(jget .data.id)
+ja "  status pending" '.data.status == "pending"'
+
+req "pay sebelum konfigurasi -> 404" POST "/penginapan/payments/$PG1/pay" 404 -H "Authorization: Bearer $TOKEN"
+ja "  NOT_CONFIGURED" '.errors[0].code == "NOT_CONFIGURED"'
+
+MOCK_DIR=$(mktemp -d)
+cat > "$MOCK_DIR/mock.py" <<'PYEOF'
+import json, sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+class H(BaseHTTPRequestHandler):
+    def do_POST(self):
+        n = int(self.headers.get('Content-Length', '0') or 0)
+        body = self.rfile.read(n).decode('utf-8', 'ignore')
+        try:
+            ext = json.loads(body).get('external_id', '')
+        except Exception:
+            ext = ''
+        if ext:
+            resp = {"id": "qr-mock-1", "external_id": ext, "qr_string": "mock-qr-xendit-456",
+                    "status": "ACTIVE", "expires_at": "2030-01-01T00:00:00Z"}
+        else:
+            resp = {"qr_string": "mock-qr-midtrans-123", "expiry_time": "2030-01-01 00:00:00"}
+        data = json.dumps(resp).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+    def log_message(self, *a):
+        pass
+HTTPServer(('127.0.0.1', int(sys.argv[1])), H).serve_forever()
+PYEOF
+python3 "$MOCK_DIR/mock.py" 18080 >/dev/null 2>&1 &
+MOCK_PID=$!
+trap 'kill $MOCK_PID 2>/dev/null; rm -rf "$MOCK_DIR"' EXIT
+sleep 1
+
+req "config payment_gateway=midtrans -> 201" POST /penginapan/configs 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"key_configs":"payment_gateway","value_configs":"midtrans"}'
+req "config midtrans_server_key -> 201" POST /penginapan/configs 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"key_configs":"midtrans_server_key","value_configs":"testserverkey"}'
+req "config midtrans_api_url (mock) -> 201" POST /penginapan/configs 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"key_configs":"midtrans_api_url","value_configs":"http://127.0.0.1:18080"}'
+
+req "GET payment-gateway terkonfigurasi -> 200" GET /penginapan/payment-gateway 200 -H "Authorization: Bearer $TOKEN"
+ja "  configured=true provider" '.data.configured == true and .data.provider == "midtrans"'
+
+req "POST pay PG1 (midtrans mock QRIS) -> 200" POST "/penginapan/payments/$PG1/pay" 200 -H "Authorization: Bearer $TOKEN"
+ja "  qr_string midtrans" '.data.provider == "midtrans" and .data.qr_string == "mock-qr-midtrans-123"'
+EXT=$(jget .data.external_id)
+
+req "POST pay ulang (idempoten) -> 200" POST "/penginapan/payments/$PG1/pay" 200 -H "Authorization: Bearer $TOKEN"
+ja "  external_id sama" '.data.external_id == "'"$EXT"'"'
+
+req "webhook midtrans signature salah -> 401" POST /penginapan/webhooks/midtrans 401 -H 'Content-Type: application/json' \
+  -d '{"order_id":"'"$EXT"'","gross_amount":75000,"status_code":"200","signature_key":"c0ffeebad","transaction_status":"settlement"}'
+SIG=$(printf '%s' "${EXT}75000200testserverkey" | sha512sum | cut -d' ' -f1)
+req "webhook midtrans settlement valid -> 200" POST /penginapan/webhooks/midtrans 200 -H 'Content-Type: application/json' \
+  -d '{"order_id":"'"$EXT"'","gross_amount":75000,"status_code":"200","signature_key":"'"$SIG"'","transaction_status":"settlement","settlement_time":"2026-10-15 12:00:00"}'
+ja "  ok payment lunas" '.data.status == "ok" and .data.payment_status == "lunas"'
+
+req "GET PG1 setelah webhook -> 200" GET "/penginapan/payments/$PG1" 200 -H "Authorization: Bearer $TOKEN"
+ja "  lunas + gateway midtrans" '.data.status == "lunas" and .data.gateway == "midtrans" and .data.paid_at != null and .data.gateway_status == "settlement"'
+
+req "webhook midtrans idempoten -> 200" POST /penginapan/webhooks/midtrans 200 -H 'Content-Type: application/json' \
+  -d '{"order_id":"'"$EXT"'","gross_amount":75000,"status_code":"200","signature_key":"'"$SIG"'","transaction_status":"settlement"}'
+ja "  already_paid" '.data.already_paid == true'
+
+SIG2=$(printf '%s' "NOPE-9991200testserverkey" | sha512sum | cut -d' ' -f1)
+req "webhook external_id tak dikenal -> 404" POST /penginapan/webhooks/midtrans 404 -H 'Content-Type: application/json' \
+  -d '{"order_id":"NOPE-999","gross_amount":1,"status_code":"200","signature_key":"'"$SIG2"'","transaction_status":"settlement"}'
+SIG3=$(printf '%s' "${EXT}1200testserverkey" | sha512sum | cut -d' ' -f1)
+req "webhook jumlah tidak sesuai -> 403" POST /penginapan/webhooks/midtrans 403 -H 'Content-Type: application/json' \
+  -d '{"order_id":"'"$EXT"'","gross_amount":1,"status_code":"200","signature_key":"'"$SIG3"'","transaction_status":"settlement"}'
+
+req "GET config payment_gateway by key" GET /penginapan/configs/key/payment_gateway 200 -H "Authorization: Bearer $TOKEN"
+PGW_ID=$(jget .data.id_configs)
+req "PUT payment_gateway=xendit -> 200" PUT "/penginapan/configs/$PGW_ID" 200 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"value_configs":"xendit"}'
+req "config xendit_secret_key -> 201" POST /penginapan/configs 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"key_configs":"xendit_secret_key","value_configs":"xnd-test-secret"}'
+req "config xendit_callback_token -> 201" POST /penginapan/configs 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"key_configs":"xendit_callback_token","value_configs":"cbtoken123"}'
+req "config xendit_api_url (mock) -> 201" POST /penginapan/configs 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"key_configs":"xendit_api_url","value_configs":"http://127.0.0.1:18080"}'
+
+req "pay payment lunas -> 409" POST "/penginapan/payments/$PG1/pay" 409 -H "Authorization: Bearer $TOKEN"
+ja "  PAYMENT_PAID" '.errors[0].code == "PAYMENT_PAID"'
+req "pay payment batal -> 409" POST "/penginapan/payments/$PMAN/pay" 409 -H "Authorization: Bearer $TOKEN"
+ja "  PAYMENT_VOID" '.errors[0].code == "PAYMENT_VOID"'
+
+req "POST payment pending 2 -> 201" POST /penginapan/payments 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"amount\":60000,\"payment_method_id\":$CASH_ID,\"source_id\":1,\"status\":\"pending\",\"guest_ids\":[$GX]}"
+PG2=$(jget .data.id)
+req "POST pay PG2 (xendit mock QRIS) -> 200" POST "/penginapan/payments/$PG2/pay" 200 -H "Authorization: Bearer $TOKEN"
+ja "  provider xendit qr_string" '.data.provider == "xendit" and .data.qr_string == "mock-qr-xendit-456"'
+XEXT=$(jget .data.external_id)
+
+req "webhook xendit token salah -> 401" POST /penginapan/webhooks/xendit 401 -H 'Content-Type: application/json' \
+  -H 'X-Callback-Token: wrongtoken' \
+  -d '{"external_id":"'"$XEXT"'","status":"PAID","amount":60000}'
+req "webhook xendit PAID valid -> 200" POST /penginapan/webhooks/xendit 200 -H 'Content-Type: application/json' \
+  -H 'X-Callback-Token: cbtoken123' \
+  -d '{"external_id":"'"$XEXT"'","status":"PAID","amount":60000,"paid_at":"2026-10-15T12:05:00+07:00"}'
+ja "  ok payment lunas" '.data.status == "ok" and .data.payment_status == "lunas"'
+req "GET PG2 setelah webhook -> 200" GET "/penginapan/payments/$PG2" 200 -H "Authorization: Bearer $TOKEN"
+ja "  lunas + gateway xendit" '.data.status == "lunas" and .data.gateway == "xendit" and .data.gateway_status == "PAID"'
+
+req "POST payment pending 3 -> 201" POST /penginapan/payments 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"amount\":55000,\"payment_method_id\":$CASH_ID,\"source_id\":1,\"status\":\"pending\",\"guest_ids\":[$GX]}"
+PG3=$(jget .data.id)
+req "POST pay PG3 -> 200" POST "/penginapan/payments/$PG3/pay" 200 -H "Authorization: Bearer $TOKEN"
+ja "  ada invoice" '.data.external_id != null'
+XEXT3=$(jget .data.external_id)
+req "webhook xendit EXPIRED -> 200" POST /penginapan/webhooks/xendit 200 -H 'Content-Type: application/json' \
+  -H 'X-Callback-Token: cbtoken123' \
+  -d '{"external_id":"'"$XEXT3"'","status":"EXPIRED"}'
+req "GET PG3 masih pending + gateway_status EXPIRED" GET "/penginapan/payments/$PG3" 200 -H "Authorization: Bearer $TOKEN"
+ja "  pending + EXPIRED" '.data.status == "pending" and .data.gateway_status == "EXPIRED"'
+
+req "DELETE config payment_gateway -> 200" DELETE "/penginapan/configs/$PGW_ID" 200 -H "Authorization: Bearer $TOKEN"
+req "pay setelah gateway dilepas -> 404" POST "/penginapan/payments/$PG3/pay" 404 -H "Authorization: Bearer $TOKEN"
+ja "  NOT_CONFIGURED" '.errors[0].code == "NOT_CONFIGURED"'
+req "GET payment-gateway setelah dilepas -> 200" GET /penginapan/payment-gateway 200 -H "Authorization: Bearer $TOKEN"
+ja "  configured=false" '.data.configured == false'
+
 echo ""
 echo "================================"
 echo "TOTAL: PASS=$PASS FAIL=$FAIL"

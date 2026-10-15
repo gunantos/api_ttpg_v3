@@ -2,8 +2,8 @@ package auth
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -43,6 +43,7 @@ func SetUsersDB(db *gorm.DB) {
 	UsersDB = db
 	logCh = make(chan models.TtpgLog, 2048)
 	go logWorker()
+	go logCleanupWorker()
 }
 
 func GenerateToken(userID uint, role string, poIDs []string) (string, error) {
@@ -158,6 +159,7 @@ func ParsePOIDs(s string) []string {
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
+		captureBody(c)
 		var (
 			user       *models.TtpgUser
 			scheme     string

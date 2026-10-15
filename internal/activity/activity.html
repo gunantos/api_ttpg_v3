@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TTPG — Aktivitas &amp; Log Request</title>
+<style>
+  :root{--bg:#0d1b33;--panel:#12244a;--panel2:#0b1c3d;--line:#1c3f8a;--txt:#e8eefc;--mut:#8fa6d4;--acc:#3b82f6;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--blue:#38bdf8}
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(160deg,#0a1730,#0d1b33 40%,#0b1c3d);color:var(--txt);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
+  .top{display:flex;align-items:center;gap:14px;padding:14px 20px;background:#0b2455;border-bottom:1px solid var(--line)}
+  .top h1{font-size:17px;margin:0}
+  .top .sub{color:var(--mut);font-size:12px}
+  .grow{flex:1}
+  .wrap{max-width:1200px;margin:18px auto;padding:0 16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  input,select,button{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 10px;font-size:13px;outline:none}
+  input:focus,select:focus{border-color:var(--acc)}
+  button{cursor:pointer}
+  button.primary{background:var(--acc);border-color:var(--acc)}
+  button.ghost{background:transparent}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .chk{display:flex;align-items:center;gap:6px;color:var(--mut);font-size:12px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{color:var(--mut);text-align:left;font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:8px 10px;border-bottom:1px solid #16305f;vertical-align:top}
+  tr.row:hover{background:#163060;cursor:pointer}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.3px}
+  .m-get{background:#0c3b2e;color:#4ade80}.m-post{background:#0b2f52;color:#38bdf8}.m-put{background:#3b2f0c;color:#fbbf24}.m-del{background:#3b1010;color:#f87171}.m-other{background:#25324d;color:#9fb2d9}
+  .s2{background:#0c3b2e;color:#4ade80}.s3{background:#0b2f52;color:#38bdf8}.s4{background:#3b2a0c;color:#fbbf24}.s5{background:#3b1010;color:#f87171}.s0{background:#25324d;color:#9fb2d9}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+  .dot.y{background:var(--ok)}.dot.n{background:var(--err)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+  .dim{color:var(--mut)}
+  .detail td{background:#0a1a3d}
+  .kv{display:grid;grid-template-columns:110px 1fr;gap:4px 10px;margin:4px 0 8px}
+  .kv b{color:var(--mut);font-weight:600}
+  pre{margin:0;background:#071227;border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;max-height:220px;white-space:pre-wrap;word-break:break-all}
+  .pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;color:var(--mut);font-size:12px}
+  .banner{background:#3b1010;border:1px solid #7f1d1d;color:#fecaca;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:none}
+  .banner.show{display:block}
+  .ok-banner{background:#0c3b2e;border:1px solid #14532d;color:#bbf7d0;border-radius:10px;padding:10px 14px;margin-bottom:14px;display:none}
+  .ok-banner.show{display:block}
+  #tokenbox{max-width:560px;margin:60px auto}
+  #tokenbox h2{margin:0 0 6px}
+  #tokenbox p{color:var(--mut);margin:0 0 14px}
+  .hidden{display:none!important}
+  .pill{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:11px;color:var(--mut)}
+  @media(max-width:760px){.hide-s{display:none}}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Aktivitas &amp; Log Request</h1>
+  <span class="sub">riwayat request Anda: status, data terkirim, IP, durasi</span>
+  <span class="grow"></span>
+  <span class="pill hide-s" id="whoami">—</span>
+  <button class="ghost" id="btnLogout" title="Ganti token">Ganti token</button>
+</div>
+
+<div id="tokenbox" class="card">
+  <h2>Masukkan token</h2>
+  <p>Tempel JWT hasil <span class="mono">POST /auth</span> untuk melihat log request Anda. Token disimpan di browser ini saja.</p>
+  <div class="bar">
+    <input type="password" id="tokenInput" placeholder="eyJhbGciOi…" style="flex:1;min-width:260px">
+    <button class="primary" id="btnToken">Tampilkan log</button>
+  </div>
+  <p class="dim" style="margin-top:10px">Bisa juga via URL: <span class="mono">/activity?token=&lt;JWT&gt;</span></p>
+</div>
+
+<div id="app" class="wrap hidden">
+  <div class="banner" id="banner"></div>
+  <div class="ok-banner" id="okbanner"></div>
+
+  <div class="card">
+    <div class="bar">
+      <input id="fPath" placeholder="cari path… /penginapan/payments" style="min-width:230px">
+      <select id="fMethod">
+        <option value="">Semua method</option>
+        <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
+      </select>
+      <input id="fCode" placeholder="kode status" style="width:110px" inputmode="numeric">
+      <input id="fFrom" type="date" title="dari tanggal">
+      <input id="fTo" type="date" title="sampai tanggal">
+      <select id="fAuth">
+        <option value="">Auth: semua</option>
+        <option value="y">terautentikasi</option>
+        <option value="n">tanpa identitas</option>
+      </select>
+      <button class="primary" id="btnRefresh">Muat ulang</button>
+      <label class="chk"><input type="checkbox" id="auto"> auto 10 dtk</label>
+      <span class="grow"></span>
+      <span class="dim" id="rangeInfo"></span>
+    </div>
+  </div>
+
+  <div class="card" style="padding:6px 8px">
+    <table>
+      <thead><tr>
+        <th>Waktu</th><th>Method</th><th>Path</th><th>Status</th><th class="hide-s">Auth</th>
+        <th class="hide-s">Durasi</th><th class="hide-s">IP</th><th class="hide-s">Akses</th><th></th>
+      </tr></thead>
+      <tbody id="tbody"><tr><td colspan="9" class="dim">Memuat…</td></tr></tbody>
+    </table>
+    <div class="pager">
+      <span id="pageInfo">—</span>
+      <button id="prev">‹ Sebelumnya</button>
+      <button id="next">Berikutnya ›</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let token = '', offset = 0, limit = 20, totalPages = 0, timer = null;
+
+function setBanner(msg, ok){
+  const el = $(ok ? 'okbanner' : 'banner');
+  el.textContent = msg || '';
+  el.classList.toggle('show', !!msg);
+}
+function saveToken(t){ try{ localStorage.setItem('ttpg_activity_token', t); }catch(e){} }
+function loadToken(){
+  const q = new URLSearchParams(location.search).get('token');
+  if(q) { saveToken(q); }
+  try{ return q || localStorage.getItem('ttpg_activity_token') || ''; }catch(e){ return q || ''; }
+}
+function authHeaders(){ return { 'Authorization': 'Bearer ' + token }; }
+function fmtTime(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  if(isNaN(d)) return iso;
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+}
+function methodBadge(m){
+  const k = ({GET:'m-get',POST:'m-post',PUT:'m-put',DELETE:'m-del'})[m] || 'm-other';
+  return '<span class="badge '+k+'">'+esc(m)+'</span>';
+}
+function statusBadge(code){
+  const c = Number(code)||0, cls = c===0?'s0':(c<300?'s2':c<400?'s3':c<500?'s4':'s5');
+  return '<span class="badge '+cls+'">'+c+'</span>';
+}
+function esc(s){ return String(s??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function prettyParams(raw){
+  if(!raw) return {query:'', body:''};
+  try{
+    const o = JSON.parse(raw);
+    return {query:o.query||'', body:o.body||''};
+  }catch(e){ return {query:String(raw), body:''}; }
+}
+function prettyBody(b){
+  if(!b) return '(kosong)';
+  try{ return JSON.stringify(JSON.parse(b), null, 2); }catch(e){ return b; }
+}
+
+async function fetchLogs(){
+  if(!token) return;
+  const qs = new URLSearchParams({limit, offset,
+    path: $('fPath').value.trim(), method: $('fMethod').value,
+    code: $('fCode').value.trim(), from: $('fFrom').value, to: $('fTo').value,
+    authorized: $('fAuth').value});
+  [...qs].forEach(([k,v])=>{ if(v==='') qs.delete(k); });
+  setBanner(''); 
+  let res, data;
+  try{
+    res = await fetch('/activity/logs?'+qs, {headers: authHeaders()});
+  }catch(e){ setBanner('Gagal terhubung ke server'); return; }
+  if(res.status === 401){
+    setBanner('Token tidak valid atau kedaluwarsa — masukkan token baru.');
+    showTokenBox(); return;
+  }
+  data = await res.json();
+  if(!data.success){
+    setBanner((data.errors&&data.errors[0]?data.errors[0].detail+' — ':'') + (data.message||'Gagal memuat log'));
+    return;
+  }
+  const rows = data.data || [], p = data.pagination || {};
+  totalPages = p.total_pages || 0;
+  $('rangeInfo').textContent = 'total ' + (p.total||0) + ' log';
+  $('pageInfo').textContent = 'Halaman ' + (p.page||1) + ' / ' + (totalPages||1);
+  $('prev').disabled = !offset;
+  $('next').disabled = (offset + limit) >= (p.total||0);
+  if(!rows.length){
+    $('tbody').innerHTML = '<tr><td colspan="9" class="dim">Belum ada log untuk filter ini.</td></tr>';
+    return;
+  }
+  $('tbody').innerHTML = rows.map((r,i)=>{
+    const pr = prettyParams(r.params);
+    return '<tr class="row" data-i="'+i+'">'+
+      '<td class="mono">'+esc(fmtTime(r.date))+'</td>'+
+      '<td>'+methodBadge(r.method)+'</td>'+
+      '<td class="mono">'+esc(r.uri)+'</td>'+
+      '<td>'+statusBadge(r.response_code)+'</td>'+
+      '<td class="hide-s">'+(r.authorized==='y'?'<span class="dot y"></span>ya':'<span class="dot n"></span>tidak')+'</td>'+
+      '<td class="hide-s dim">'+(r.rtime!=null? (r.rtime*1000).toFixed(1)+' ms':'—')+'</td>'+
+      '<td class="hide-s dim mono">'+esc(r.ip_address)+'</td>'+
+      '<td class="hide-s dim">'+esc(r.access_by)+'</td>'+
+      '<td class="dim">▾</td></tr>'+
+      '<tr class="detail hidden" id="d'+i+'"><td colspan="9">'+
+        '<div class="kv">'+
+          '<b>Query</b><span class="mono">'+(esc(pr.query)||'<i class="dim">—</i>')+'</span>'+
+          '<b>PO ids</b><span class="mono">'+(esc(r.po_id)||'—')+'</span>'+
+          '<b>id_user</b><span class="mono">'+esc(r.id_user)+' · api_key '+esc(r.api_key||'-')+'</span>'+
+        '</div>'+
+        '<div style="margin-bottom:4px" class="dim">Data terkirim (body) — rahasia disamarkan:</div>'+
+        '<pre>'+esc(prettyBody(pr.body))+'</pre>'+
+      '</td></tr>';
+  }).join('');
+  [...$('tbody').querySelectorAll('tr.row')].forEach(tr=>{
+    tr.onclick = ()=>{
+      const d = $('d'+tr.dataset.i);
+      if(d) d.classList.toggle('hidden');
+    };
+  });
+}
+
+function showTokenBox(){
+  $('app').classList.add('hidden');
+  $('tokenbox').classList.remove('hidden');
+  stopAuto();
+}
+function showApp(){
+  $('tokenbox').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  $('whoami').textContent = 'token aktif';
+  offset = 0;
+  fetchLogs();
+}
+function stopAuto(){ if(timer){ clearInterval(timer); timer=null; $('auto').checked=false; } }
+
+$('btnToken').onclick = ()=>{
+  token = $('tokenInput').value.trim();
+  if(!token){ setBanner('Token kosong', true); return; }
+  saveToken(token); showApp();
+};
+$('btnLogout').onclick = ()=>{ token=''; saveToken(''); try{localStorage.removeItem('ttpg_activity_token');}catch(e){} showTokenBox(); };
+$('btnRefresh').onclick = ()=>{ offset=0; fetchLogs(); };
+$('prev').onclick = ()=>{ offset = Math.max(0, offset-limit); fetchLogs(); };
+$('next').onclick = ()=>{ offset += limit; fetchLogs(); };
+$('fPath').addEventListener('keydown', e=>{ if(e.key==='Enter'){ offset=0; fetchLogs(); }});
+['fMethod','fCode','fFrom','fTo','fAuth'].forEach(id=> $(id).onchange = ()=>{ offset=0; fetchLogs(); });
+$('auto').onchange = ()=>{
+  stopAuto();
+  if($('auto').checked){ timer = setInterval(fetchLogs, 10000); $('auto').checked=true; }
+};
+
+token = loadToken();
+if(token) showApp(); else showTokenBox();
+</script>
+</body>
+</html>

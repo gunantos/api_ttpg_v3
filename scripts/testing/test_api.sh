@@ -234,6 +234,39 @@ sleep 1
 LOGS=$(sqlu "SELECT COUNT(*) FROM logs WHERE uri LIKE '/tujuan%' OR uri LIKE '/boarding%'")
 if [ -n "$LOGS" ] && [ "$LOGS" -gt 0 ] 2>/dev/null; then PASS=$((PASS+1)); echo "PASS  logs ttpg_users tercatat ($LOGS baris)"; else FAIL=$((FAIL+1)); echo "FAIL  logs kosong -> '$LOGS'"; fi
 
+echo "===== I. ACTIVITY & LOGS ====="
+req "GET /activity (halaman UI public) -> 200" GET /activity 200
+case "$BODY" in
+  *Aktivitas*) PASS=$((PASS+1)); echo "PASS  halaman activity ter-render" ;;
+  *) FAIL=$((FAIL+1)); echo "FAIL  halaman activity body=${BODY:0:150}" ;;
+esac
+req "GET /activity/logs tanpa token -> 401" GET /activity/logs 401
+
+req "POST body dgn password (ujian redaksi) -> 400" POST /penginapan/configs 400 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"password":"rahasia123"}'
+sleep 1
+PWLOG=$(sqlu "SELECT params FROM logs WHERE uri='/penginapan/configs' AND method='POST' ORDER BY id DESC LIMIT 1")
+case "$PWLOG" in
+  *"[REDACTED]"*) PASS=$((PASS+1)); echo "PASS  password di-log jadi [REDACTED]" ;;
+  *) FAIL=$((FAIL+1)); echo "FAIL  redaksi tidak ada -> '${PWLOG:0:160}'" ;;
+esac
+case "$PWLOG" in
+  *rahasia123*) FAIL=$((FAIL+1)); echo "FAIL  password bocor ke log -> '${PWLOG:0:160}'" ;;
+  *) PASS=$((PASS+1)); echo "PASS  password tidak bocor ke log" ;;
+esac
+
+req "GET /activity/logs (admin) -> 200" GET /activity/logs 200 -H "Authorization: Bearer $TOKEN"
+ja "  ada data + pagination" '(.data | length) > 0 and .pagination.total > 0'
+req "GET /activity/logs?method=GET" GET "/activity/logs?method=GET" 200 -H "Authorization: Bearer $TOKEN"
+ja "  semua GET" 'all(.data[]; .method == "GET")'
+req "GET /activity/logs?path=/tujuan" GET "/activity/logs?path=/tujuan" 200 -H "Authorization: Bearer $TOKEN"
+ja "  semua uri mengandung /tujuan" 'all(.data[]; (.uri | contains("/tujuan")))'
+req "GET /activity/logs?code=999" GET "/activity/logs?code=999" 200 -H "Authorization: Bearer $TOKEN"
+ja "  kosong" '(.data | length) == 0'
+req "GET /activity/logs?limit=3" GET "/activity/logs?limit=3" 200 -H "Authorization: Bearer $TOKEN"
+ja "  maksimal 3" '(.data | length) <= 3 and .pagination.limit == 3'
+req "GET /activity/logs (limited) -> 200" GET /activity/logs 200 -H "Authorization: Bearer $LTOKEN"
+ja "  hanya log miliknya (id_user=2)" 'all(.data[]; .id_user == 2)'
+
 echo ""
 echo "================================"
 echo "TOTAL: PASS=$PASS FAIL=$FAIL"

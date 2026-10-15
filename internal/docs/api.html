@@ -155,7 +155,7 @@
 <main>
   <div class="hero">
     <h2>Dokumentasi API TTPG</h2>
-    <p>Terminal Tiket &amp; Gate + modul Penginapan. 3 MySQL (<code>ttpg_auth</code>, <code>ttpg</code>, <code>ttpg_penginapan</code>) + MongoDB (<code>ttpg</code>).
+    <p>Terminal Tiket &amp; Gate + modul Penginapan. 4 MySQL (<code>ttpg_users</code>, <code>ttpg_auth</code>, <code>ttpg</code>, <code>ttpg_penginapan</code>) + MongoDB (<code>ttpg</code>).
        Semua endpoint, parameter, body, dan contoh respons ada di bawah — lengkap dengan snippet cURL, PHP, Python, Node.js, dan Go.</p>
     <div class="toolbar">
       <div class="f">
@@ -183,13 +183,13 @@
     <h3>Ringkasan Auth</h3>
     <table>
       <tr><th>Cara</th><th>Header</th><th>Dipakai untuk</th></tr>
-      <tr><td>Tanpa auth</td><td>—</td><td><code>POST /auth</code>, <code>/boarding/print/:code</code>, <code>/penginapan/payments/:id/receipt</code>, <code>/ws</code>, <code>/docs</code></td></tr>
+      <tr><td>Tanpa auth</td><td>—</td><td><code>POST /auth</code>, <code>/boarding/print/:code</code>, <code>/penginapan/payments/:id/receipt</code>, <code>/penginapan/webhooks/{midtrans,xendit}</code>, <code>/ws</code>, <code>/docs</code>, <code>/activity</code></td></tr>
       <tr><td>JWT</td><td><code>Authorization: Bearer &lt;token&gt;</code></td><td>semua route protected — token dari <code>POST /auth</code>, berlaku 1 minggu</td></tr>
       <tr><td>Basic</td><td><code>Authorization: Basic base64(user:pass)</code></td><td>semua route protected — user aktif di <code>ttpg_users.user</code> (bcrypt)</td></tr>
       <tr><td>API key user</td><td><code>X-ttpg-key: dev-key-123</code> atau <code>X-API-Key</code></td><td>semua route protected — cocok <code>user.secret_key</code> di <code>ttpg_users</code></td></tr>
       <tr><td>API key literal</td><td><code>X-ttpg-key: 12345</code> atau <code>X-API-Key</code></td><td>semua route protected — cocok literal dengan env <code>API_KEY</code> (superkey, <code>user_id=0</code>)</td></tr>
     </table>
-    <div class="note">Satu middleware seragam (<code>auth.AuthMiddleware</code>): header API key (literal env <code>API_KEY</code> dulu, baru <code>user.secret_key</code>) → <code>Authorization</code> (Bearer/Basic). Digest dilepas. Lalu aturan endpoint dari tabel <code>api_url</code>/<code>access</code> (skema wajib + izin) — ditolak → 403. Gagal auth → 401 + <code>WWW-Authenticate</code> (Basic). Semua request dicatat async ke <code>logs</code>.</div>
+    <div class="note">Satu middleware seragam (<code>auth.AuthMiddleware</code>): header API key (literal env <code>API_KEY</code> dulu, baru <code>user.secret_key</code>) → <code>Authorization</code> (Bearer/Basic). Digest dilepas. Lalu aturan endpoint dari tabel <code>api_url</code>/<code>access</code> (skema wajib + izin) — ditolak → 403. Gagal auth → 401 + <code>WWW-Authenticate</code> (Basic). Semua request dicatat async ke <code>logs</code> (query + body ter-redaksi, <code>password</code>/<code>secret</code>/<code>token</code> → <code>[REDACTED]</code>) dan dihapus otomatis lebih tua dari <code>LOG_RETENTION_DAYS</code> (default 30 hari) — lihat halaman <code>/activity</code>.</div>
     <h3>Format response</h3>
     <p style="color:var(--muted);margin:6px 0"><b>A. Standar</b> — <code>POST /auth</code>, <code>/tujuan</code>, <code>/po</code>, <code>/boarding*</code>, seluruh <code>/penginapan/*</code>:</p>
     <pre>{
@@ -493,6 +493,30 @@ const GROUPS = [
   responses:[
     {code:200, label:"OK", example:{success:true, message:"Konfigurasi QRIS ditemukan", data:{payload:"00020101021126610014COM.GO-JEK.WWW0…", merchant:"Nama Merchant"}}},
     {code:404, label:"Belum dikonfigurasi", example:{success:false, message:"QRIS belum dikonfigurasi", errors:[{code:"NOT_CONFIGURED", detail:"isi key_configs 'qris_payload' …"}]}}]},
+ {id:"p-gateway", method:"GET", path:"/penginapan/payment-gateway", auth:"jwt", desc:"Info payment gateway aktif (Midtrans/Xendit, alur QRIS). Provider dipilih via config payment_gateway; configured=true bila kredensial lengkap. Frontend cek endpoint ini sebelum menawarkan bayar via gateway.",
+  responses:[
+    {code:200, label:"OK", example:{success:true, message:"Konfigurasi payment gateway", data:{provider:"midtrans", configured:true, env:"sandbox", webhook_path:"/penginapan/webhooks/midtrans"}}},
+    {code:200, label:"Belum diset", example:{success:true, message:"Konfigurasi payment gateway", data:{provider:"", configured:false, detail:"isi key_configs 'payment_gateway' (midtrans|xendit) + kredensialnya via POST /penginapan/configs"}}}]},
+ {id:"p-pay", method:"POST", path:"/penginapan/payments/:id/pay", auth:"jwt", desc:"Buat QRIS payment gateway untuk payment pending. Response berisi qr_string (string EMV QR) — frontend render sebagai gambar QR lalu tamu scan; bukan halaman invoice. Idempoten: QRIS pending belum expired dikembalikan ulang tanpa charge baru. Kolom gateway/external_id/qr_string tersimpan di payments.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id payment (status pending)"}],
+  responses:[
+    {code:200, label:"QRIS dibuat", example:{success:true, message:"QRIS pembayaran dibuat", data:{payment_id:5, provider:"midtrans", external_id:"TPG-PAY-5-1760500000", qr_string:"00020101021126610014COM.GO-JEK.WWW0…", gateway_status:"pending", expires_at:"2026-10-15T12:30:00Z"}}},
+    {code:404, label:"Gateway belum dikonfigurasi", example:{success:false, message:"Payment gateway belum dikonfigurasi", errors:[{code:"NOT_CONFIGURED", detail:"set key_configs 'payment_gateway' + kredensial via POST /penginapan/configs"}]}},
+    {code:409, label:"Sudah lunas/batal", example:{success:false, message:"Pembayaran sudah lunas", errors:[{code:"PAYMENT_PAID", detail:"tidak perlu tagihan gateway"}]}},
+    {code:502, label:"Gateway error", example:{success:false, message:"Payment gateway gagal membuat tagihan", errors:[{code:"GATEWAY_ERROR", detail:"midtrans HTTP 401: …"}]}}]},
+ {id:"p-wh-midtrans", method:"POST", path:"/penginapan/webhooks/midtrans", auth:"none", desc:"Public — notifikasi pembayaran Midtrans QRIS (POST /qris). Verifikasi signature_key = SHA512(order_id + gross_amount + status_code + server_key). settlement/capture → lunas (+paid_at); cancel/deny/expire → gateway_status saja. Gross amount wajib = amount payment (selisih → 403). Idempoten bila sudah lunas.",
+  body:{example:{transaction_status:"settlement", order_id:"TPG-PAY-5-1760500000", gross_amount:50000, status_code:"200", signature_key:"…"}},
+  responses:[
+    {code:200, label:"OK", example:{success:true, message:"Webhook diproses", data:{status:"ok", payment_id:5, payment_status:"lunas"}}},
+    {code:401, label:"Signature salah", example:{success:false, message:"Signature/token webhook tidak valid", errors:[{code:"INVALID_SIGNATURE", detail:"…"}]}},
+    {code:403, label:"Jumlah tidak sesuai", example:{success:false, message:"Jumlah pembayaran tidak sesuai", errors:[{code:"AMOUNT_MISMATCH", detail:"gateway=1 pembayaran=50000"}]}},
+    {code:404, label:"external_id tak dikenal", example:{success:false, message:"Pembayaran dengan external_id tersebut tidak ditemukan"}}]},
+ {id:"p-wh-xendit", method:"POST", path:"/penginapan/webhooks/xendit", auth:"none", desc:"Public — callback pembayaran Xendit QR Code (POST /qr-codes, dynamic). Verifikasi header X-Callback-Token = config xendit_callback_token. PAID/SETTLED → lunas; FAILED/EXPIRED → gateway_status saja (payment tetap pending).",
+  body:{example:{external_id:"TPG-PAY-6-1760500100", status:"PAID", amount:60000, paid_at:"2026-10-15T12:05:00+07:00"}},
+  responses:[
+    {code:200, label:"OK", example:{success:true, message:"Webhook diproses", data:{status:"ok", payment_id:6, payment_status:"lunas"}}},
+    {code:401, label:"Token salah", example:{success:false, message:"Signature/token webhook tidak valid", errors:[{code:"INVALID_SIGNATURE", detail:"…"}]}},
+    {code:404, label:"external_id tak dikenal", example:{success:false, message:"Pembayaran dengan external_id tersebut tidak ditemukan"}}]},
  {id:"rh-list", method:"GET", path:"/penginapan/room-histories", auth:"jwt", desc:"History per kamar (check-in / check-out / pindah / occupancy).",
   params:[
     {name:"room_id", in:"query", type:"int", req:false, desc:"—"},
@@ -506,7 +530,22 @@ const GROUPS = [
   responses:[
     {code:101, label:"Switching Protocols", example:"(upgrade WebSocket berhasil — tidak ada body HTTP)"},
     {code:401, label:"Tanpa token", example:{message:"unauthorized"}}]},
- {id:"docs-page", method:"DOCS", path:"/docs", auth:"none", desc:"Halaman dokumentasi ini (HTML interaktif, public, tanpa auth). Versi markdown: docs/api.md di repositori."}
+ {id:"docs-page", method:"DOCS", path:"/docs", auth:"none", desc:"Halaman dokumentasi ini (HTML interaktif, public, tanpa auth). Versi markdown: docs/api.md di repositori."},
+ {id:"activity-page", method:"GET", path:"/activity", auth:"none", desc:"Halaman UI riwayat log request (public, HTML). Token via ?token=<JWT> atau tempel manual (localStorage). Menampilkan waktu, method, path, status, auth, durasi, IP, akses + detail query & body terkirim (rahasia [REDACTED]); filter method/path/status/tanggal + paginasi + auto-refresh 10 detik."},
+ {id:"activity-logs", method:"GET", path:"/activity/logs", auth:"jwt", desc:"API JSON di balik halaman /activity. User biasa selalu hanya melihat log miliknya (id_user); admin melihat semua + filter user_id. Log dihapus otomatis > LOG_RETENTION_DAYS (default 30 hari).",
+  params:[
+    {name:"limit", in:"query", type:"int", req:false, desc:"1–100, default 20"},
+    {name:"offset", in:"query", type:"int", req:false, desc:"default 0"},
+    {name:"method", in:"query", type:"string", req:false, desc:"GET | POST | PUT | DELETE"},
+    {name:"code", in:"query", type:"int", req:false, desc:"response_code persis, mis. 403"},
+    {name:"path", in:"query", type:"string", req:false, desc:"substring uri, mis. /penginapan"},
+    {name:"authorized", in:"query", type:"string", req:false, desc:"y | n"},
+    {name:"from", in:"query", type:"string", req:false, desc:"YYYY-MM-DD (mulai)"},
+    {name:"to", in:"query", type:"string", req:false, desc:"YYYY-MM-DD (sampai, inclusive)"},
+    {name:"user_id", in:"query", type:"int", req:false, desc:"admin saja"}],
+  responses:[
+    {code:200, label:"OK", example:{success:true, message:"Log aktivitas ditemukan", data:[{id:64, uri:"/penginapan/payments", method:"POST", params:"{\"query\":\"\",\"body\":\"{\\\"amount\\\":50000}\"}", ip_address:"127.0.0.1", rtime:0.012, authorized:"y", response_code:201, id_user:1, access_by:"bearer_token", date:"2026-10-15T10:30:00+07:00"}], pagination:{page:1, limit:20, total:64, total_pages:4}}},
+    {code:401, label:"Tanpa/kedaluwarsa token", example:{success:false, message:"unauthorized"}}]}
 ]}
 ];
 

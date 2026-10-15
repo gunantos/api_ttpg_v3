@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andtho89/ttpg/internal/models"
 	"github.com/andtho89/ttpg/internal/logger"
+	"github.com/andtho89/ttpg/internal/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -130,10 +130,7 @@ func enqueueLog(c *gin.Context, start time.Time, scheme, keyUsed string, identif
 	if len(uri) > 250 {
 		uri = uri[:250]
 	}
-	params := c.Request.URL.RawQuery
-	if len(params) > 2000 {
-		params = params[:2000]
-	}
+	params := logParams(c)
 	if keyUsed == "" {
 		keyUsed = ""
 	} else if len(keyUsed) > 40 {

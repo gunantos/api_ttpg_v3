@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/andtho89/ttpg/internal/activity"
 	"github.com/andtho89/ttpg/internal/docs"
 	"github.com/andtho89/ttpg/internal/handler"
 	"github.com/andtho89/ttpg/internal/models"
@@ -26,9 +27,13 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 	r.GET("/boardingpass/print/:code", handler.PrintBoardingpass)
 	r.GET("/ws", handler.HandleWS)
 	r.GET("/docs", docs.Serve)
+	r.GET("/activity", activity.Serve)
 	r.GET("/penginapan/payments/:id/receipt", handler.PaymentReceipt)
+	r.POST("/penginapan/webhooks/midtrans", handler.WebhookMidtrans)
+	r.POST("/penginapan/webhooks/xendit", handler.WebhookXendit)
 
 	apiKeyAuth := r.Group("", auth.AuthMiddleware())
+	apiKeyAuth.GET("/activity/logs", handler.ListActivityLogs)
 	apiKeyAuth.POST("/gate", handler.Gate)
 	apiKeyAuth.POST("/checkin-mandiri", handler.CheckinMandiri)
 	apiKeyAuth.GET("/boardingpass", handler.List)
@@ -383,8 +388,10 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 	peng.GET("/payments", handler.ListPayments)
 	peng.GET("/payments/:id", handler.GetPayment)
 	peng.POST("/payments", handler.CreatePaymentPenginapan)
+	peng.POST("/payments/:id/pay", handler.PayWithPayment)
 	peng.PUT("/payments/:id", handler.UpdatePaymentPenginapan)
 	peng.DELETE("/payments/:id", handler.VoidPaymentPenginapan)
+	peng.GET("/payment-gateway", handler.GetPaymentGateway)
 
 	peng.GET("/room-histories", handler.ListRoomHistories)
 }

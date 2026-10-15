@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -25,6 +26,7 @@ type Config struct {
 	DamriBaseURL                string
 	DamriTimeoutSeconds         int
 	IgnoredMongoUserIDs         []int
+	LogRetentionDays            int
 }
 
 var C *Config
@@ -50,6 +52,7 @@ func Load() *Config {
 		DamriBaseURL:                getEnv("DAMRI_BASE_URL", ""),
 		DamriTimeoutSeconds:         10,
 		IgnoredMongoUserIDs:         []int{},
+		LogRetentionDays:            getEnvInt("LOG_RETENTION_DAYS", 30),
 	}
 	C = c
 	return c
@@ -68,6 +71,15 @@ func (c *Config) IsIDCardAllowed(noreg string) bool {
 func getEnv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return fallback
 }

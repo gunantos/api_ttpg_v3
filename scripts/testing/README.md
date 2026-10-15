@@ -49,16 +49,16 @@ MONGO_URI='mongodb://127.0.0.1:27017' ./ttpg_server &
 | Skrip | Fungsi |
 |-------|--------|
 | `reset.sh` | Reset data uji (schema + seed Mongo + row GATE002 + po_ids kosong + re-migrasi `ttpg_penginapan`) |
-| `test_api.sh` | 139 assert: auth (JWT/Basic/API key seragam via `ttpg_users`), aturan endpoint (`api_url` wajib Bearer → 403, akses `access.id_api` → 403, blokir user → 403, logs tercatat), boarding Mongo list (paginasi + filter `destination_id`), docs interaktif `/docs`, gate (valid/rescan/max/expired/fallback + scan via JWT/Basic), boardingpass (CRUD: list/update/delete + get/print + secret_key), checkin mandiri, boarding Mongo CRUD, restriksi po_id |
+| `test_api.sh` | 157 assert: auth (JWT/Basic/API key seragam via `ttpg_users`), aturan endpoint (`api_url` wajib Bearer → 403, akses `access.id_api` → 403, blokir user → 403, logs tercatat), boarding Mongo list (paginasi + filter `destination_id`), docs interaktif `/docs`, gate (valid/rescan/max/expired/fallback + scan via JWT/Basic), boardingpass (CRUD: list/update/delete + get/print + secret_key), checkin mandiri, boarding Mongo CRUD, restriksi po_id, activity & logs (halaman /activity public, /activity/logs 401 tanpa token, redaksi password jadi [REDACTED], filter method/path/code/limit, isolasi log per user) |
 | `test_env_flags.sh` | 5 assert: `BYPASS=true`, `LIST_ID_CARD`, kembali normal (restart server) |
-| `test_penginapan.sh` | 87 assert: configs/lookups, master lokasi/kamar/layout, check-in (lunas/pending/alokasi/kapasitas/maintenance), summary lunas, payment manual/void, checkout, pindah kamar, histories, guard delete, struk pembayaran (public + autoprint + 404), QRIS (404 belum dikonfigurasi → config → 200 payload) |
+| `test_penginapan.sh` | 139 assert: configs/lookups, master lokasi/kamar/layout, check-in (lunas/pending/alokasi/kapasitas/maintenance), summary lunas, payment manual/void, checkout, pindah kamar, histories, guard delete, struk pembayaran (public + autoprint + 404), QRIS (404 belum dikonfigurasi → config → 200 payload), payment gateway midtrans/xendit QRIS (mock server lokal `python3` port 18080: charge → qr_string, idempoten, webhook valid/salah signature → lunas, amount mismatch → 403, unknown external_id → 404, EXPIRED → tetap pending, NOT_CONFIGURED) |
 | `test_ws.sh` | 14 assert: auth `/ws` (401 tanpa/salah token), koneksi client, event `room` (status change), event `occupancy` + `guest` (check-in) — build test client otomatis dari `wsclient/` |
 
 ```bash
 ./reset.sh
-./test_api.sh         # ekspektasi: TOTAL: PASS=139 FAIL=0
+./test_api.sh         # ekspektasi: TOTAL: PASS=157 FAIL=0
 ./test_env_flags.sh   # ekspektasi: TOTAL: PASS=5 FAIL=0
-./reset.sh && ./test_penginapan.sh   # ekspektasi: TOTAL: PASS=87 FAIL=0
+./reset.sh && ./test_penginapan.sh   # ekspektasi: TOTAL: PASS=139 FAIL=0
 ./reset.sh && ./test_ws.sh           # ekspektasi: TOTAL: PASS=14 FAIL=0
 ```
 
@@ -68,4 +68,5 @@ Catatan:
 - `test_env_flags.sh` mematikan/menyalakan ulang server via `pkill` — hanya jalankan saat server test (bukan produksi).
 - Noreg yang dipakai gate: `SCAN001` (checkin), `MAXSCAN1` (count_scan=5), `EXPIRE01` (time_tab >5 menit), `OLDDATE1` (tanggal kemarin → fallback eksternal), `GATE002`/`T002` (checkin conflict).
 - Fallback API tiket (`newticket.dgti.co.id`) dan Damri tidak terjangkau dari sandbox → diverifikasi sebagai jalur gagal (`success:false` / `404`).
-- `test_ws.sh` membuat location+kamar unik tiap run (suffix `date +%s`), jadi aman diulang tanpa reset. Jangan pipe output skrip ke `tail` — anak proses server mewarisi stdout sehingga pipe tidak EOF.
+- Section J (`test_penginapan.sh`) menjalankan mock server payment gateway dengan `python3` di `127.0.0.1:18080` (dihentikan otomatis via `trap EXIT`) — pastikan `python3` tersedia; API Midtrans/Xendit sungguhan tidak dipanggil.
+- `test_ws.sh` membuat location+kamar unik tiap run (suffix `date +%s`), jadi aman diulang tanpa reset. Jangan pipe output skrip ke `tail` — anak proses server mewarisi stdout sehingga pipe tidak EOF. Jangan jalankan `pkill -f` dengan pola yang ada di command-line shell sendiri (bisa match diri sendiri).

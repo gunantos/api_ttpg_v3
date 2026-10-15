@@ -19,6 +19,8 @@ Sumber kebenaran route: `internal/routes/routes.go`. **Update file ini setiap ad
 | GET | `/penginapan/payments/:id/receipt` | Tanpa auth (public) — HTML struk pembayaran 78mm, `?autoprint=1` |
 | GET | `/ws` | JWT via query `?token=` (public route, auth di handler) |
 | GET | `/docs` | Tanpa auth (public) — halaman dokumentasi interaktif (HTML, contoh kode cURL/PHP/Python/Node/Go) |
+| GET | `/activity` | Tanpa auth (public) — halaman riwayat log request user (HTML; data diambil via `?token=`) |
+| GET | `/activity/logs` | Seragam† — API log (JSON, paginasi + filter) |
 | POST | `/gate` | Seragam† |
 | POST | `/checkin-mandiri` | Seragam† |
 | GET | `/boardingpass` | Seragam† |
@@ -44,10 +46,12 @@ Sumber kebenaran route: `internal/routes/routes.go`. **Update file ini setiap ad
 | POST | `/penginapan/guests/:id/checkout`, `/penginapan/guests/:id/pindah` | JWT (AuthMiddleware) |
 | GET | `/penginapan/guests/:id/histories` | JWT (AuthMiddleware) |
 | GET/POST/PUT/DELETE | `/penginapan/payments[/:id]` | JWT (AuthMiddleware) |
+| POST | `/penginapan/payments/:id/pay` | JWT — buat tagihan payment gateway (Midtrans/Xendit) |
+| GET | `/penginapan/payment-gateway` | JWT — info gateway aktif (provider, configured) |
 | GET | `/penginapan/qris` | JWT (AuthMiddleware) |
 | GET | `/penginapan/room-histories` | JWT (AuthMiddleware) |
 
-Total 43 endpoint penginapan: 42 di group `/penginapan` + 1 public (`GET /penginapan/payments/:id/receipt`) — detail dan body request di bagian [Penginapan](#penginapan).
+Total 46 endpoint penginapan: 43 di group `/penginapan` + 3 public (`GET /penginapan/payments/:id/receipt`, `POST /penginapan/webhooks/midtrans`, `POST /penginapan/webhooks/xendit`) — detail dan body request di bagian [Penginapan](#penginapan).
 
 ---
 
@@ -83,9 +87,9 @@ Setelah identitas valid, middleware mengecek baris `api_url` yang cocok **method
 
 Rute **tanpa** baris `api_url` menerima skema apa pun (aturan hanya berlaku bila baris ada — keputusan: ketat saat ada, bebas saat tidak ada).
 
-Setiap request (termasuk yang gagal) dicatat **async** ke `ttpg_users.logs`: `uri`, `method`, `params` (query string), `api_key`, `ip_address`, `time`, `rtime`, `authorized` (`y`/`n`), `response_code`, `id_user`, `po_id`, `access_by` (skema), `date`.
+Setiap request (termasuk yang gagal) dicatat **async** ke `ttpg_users.logs`: `uri`, `method`, `params` (JSON `{"query","body"}` — query & body sudah **di-redaksi**: field rahasia seperti `password`/`secret`/`token`/`api_key` jadi `[REDACTED]`; body dibaca maks 16KB), `api_key`, `ip_address`, `time`, `rtime`, `authorized` (`y`/`n`), `response_code`, `id_user`, `po_id`, `access_by` (skema), `date`. Log **dihapus otomatis** lebih tua dari `LOG_RETENTION_DAYS` (default 30 hari; `0` = nonaktif) — pembersihan jalan tiap jam dan saat server start. Lihat bagian [Aktivitas & Log](#aktivitas--log-tampilan-user).
 
-Endpoint **public** (tanpa auth): `POST /auth`, `/boarding/print/:code` (+alias), `/penginapan/payments/:id/receipt`, `/ws` (JWT via query `?token=`), `/docs`.
+Endpoint **public** (tanpa auth): `POST /auth`, `/boarding/print/:code` (+alias), `/penginapan/payments/:id/receipt`, `/penginapan/webhooks/midtrans`, `/penginapan/webhooks/xendit`, `/ws` (JWT via query `?token=`), `/docs`, `/activity`.
 
 ---
 
@@ -435,7 +439,7 @@ Error: `400` validasi, `403` po_id tidak diizinkan, `500` DB.
 
 ## Penginapan
 
-Auth seragam (`auth.AuthMiddleware`: JWT / Basic / API key) untuk route `/penginapan/*` — **kecuali** `GET /penginapan/payments/:id/receipt` (public, seperti `/boarding/print` karena dibuka via `window.open` tanpa header). Format response: **standar A** (`success/message/data`). Database khusus `ttpg_penginapan` (env `PENGINAPAN_DSN`), GORM dengan AutoMigrate; skema canonical: `migrations/mysql/002_create_ttpg_penginapan.sql` (baru) atau `migrations/mysql/003_upgrade_penginapan_v2.sql` (upgrade skema lama produksi, tanpa DROP data).
+Auth seragam (`auth.AuthMiddleware`: JWT / Basic / API key) untuk route `/penginapan/*` — **kecuali** `GET /penginapan/payments/:id/receipt` dan webhook gateway `POST /penginapan/webhooks/{midtrans,xendit}` (public, dipanggil gateway tanpa header auth; struk dibuka via `window.open`). Format response: **standar A** (`success/message/data`). Database khusus `ttpg_penginapan` (env `PENGINAPAN_DSN`), GORM dengan AutoMigrate; skema canonical: `migrations/mysql/002_create_ttpg_penginapan.sql` (baru) atau upgrade: `003_upgrade_penginapan_v2.sql` + `005_upgrade_payments_gateway.sql` (tanpa DROP data).
 
 Aturan bisnis:
 
@@ -548,6 +552,36 @@ Error: `400` validasi/alokasi, `404` room tidak ada, `409` kapasitas penuh / mai
   "data": { "payload": "00020101021126610014COM.GO-JEK.WWW0…", "merchant": "Nama Merchant" } }
 ```
 
+### Payment gateway (Midtrans & Xendit)
+
+Pembayaran online **QRIS** via **Midtrans** atau **Xendit** — provider dipilih lewat config DB (`ttpg_penginapan.configs`), arsitektur pluggable (`internal/payment/`). Alurnya murni QR langsung (bukan halaman invoice Snap): charge mengembalikan `qr_string` → frontend render QR → tamu scan → webhook menandai lunas. Fokus saat ini **QRIS + cash**; VA dapat ditambahkan nanti (kode VA saja, tanpa halaman hosted) tanpa mengubah handler. Provider baru cukup tambah file gateway + `Register` tanpa mengubah handler.
+
+**Konfigurasi** (via `POST /penginapan/configs`, key → value):
+
+| Key | Keterangan |
+|---|---|
+| `payment_gateway` | `midtrans` atau `xendit` — provider aktif (kosong = gateway nonaktif) |
+| `midtrans_server_key` | Server key Midtrans (wajib; charge QRIS + verifikasi webhook) |
+| `midtrans_env` | `sandbox` (default) atau `production` |
+| `midtrans_api_url` | Override base URL (opsional; untuk mock/test) |
+| `xendit_secret_key` | Secret key Xendit (wajib; buat dynamic QR + verifikasi) |
+| `xendit_callback_token` | Token `X-Callback-Token` webhook Xendit (wajib utk verifikasi) |
+| `xendit_api_url` | Override base URL (opsional; untuk mock/test) |
+| `payment_gateway_callback_url` | URL finish/callback frontend (opsional) |
+
+**Alur**:
+
+1. `GET /penginapan/payment-gateway` → `{provider, configured, webhook_path}` — frontend cek gateway aktif.
+2. Check-in / `POST /penginapan/payments` dengan `status: "pending"`.
+3. `POST /penginapan/payments/:id/pay` → charge QRIS ke gateway → `{external_id, qr_string, expires_at}` — frontend render `qr_string` sebagai gambar QR (mis. lib qrCode) lalu tamu scan. Idempoten: QRIS pending yang belum kedaluwarsa dikembalikan ulang tanpa charge baru. `404 NOT_CONFIGURED` bila gateway belum diset; `409` bila payment `lunas`/`batal`; `502 GATEWAY_ERROR` bila API gateway gagal.
+4. Gateway memanggil webhook public:
+   - **Midtrans** `POST /penginapan/webhooks/midtrans` — API Midtrans QRIS (`POST /qris`); verifikasi `signature_key` = SHA512(`order_id` + `gross_amount` + `status_code` + server key); `settlement`/`capture` → payment **lunas** (+ `paid_at`); `cancel`/`deny` → `gateway_status` saja; `expire` → `gateway_status`. `gross_amount` wajib sama dengan `amount` payment (selisih → `403`).
+   - **Xendit** `POST /penginapan/webhooks/xendit` — API Xendit QR Code (`POST /qr-codes`, dynamic); verifikasi header `X-Callback-Token`; status `PAID`/`SETTLED` → **lunas**; `FAILED`/`EXPIRED` → `gateway_status` saja (payment tetap `pending`).
+   - Signature/token salah → `401`; `external_id` tak dikenal → `404`; webhook ganda saat sudah lunas → `200` idempoten.
+5. Setelah lunas (webhook) → buka `GET /penginapan/payments/:id/receipt?autoprint=1`.
+
+Kolom gateway di tabel `payments` (AutoMigrate; upgrade DB lama: `migrations/mysql/005_upgrade_payments_gateway.sql`): `gateway`, `external_id` (index), `qr_string`, `gateway_status`, `gateway_expires_at` (legacy `invoice_url`/`snap_token` tidak dipakai alur QRIS) — semua ikut ter-serialize di response `GET/POST /penginapan/payments`.
+
 ### Alur sekali jalan (front-desk)
 
 Check-in + pembayaran + struk/QRIS dapat diselesaikan dengan sedikit request:
@@ -557,10 +591,43 @@ Check-in + pembayaran + struk/QRIS dapat diselesaikan dengan sedikit request:
 3. Cabut sesuai metode:
    - **cash** (`code=cash`, default `status=lunas`) → buka `GET /penginapan/payments/{id}/receipt?autoprint=1` → selesai.
    - **qris** → `GET /penginapan/qris`, tampilkan QR ke tamu (render payload di frontend), check-in dengan `payment.status="pending"`; setelah lunas → `PUT /penginapan/payments/{id}` `{"status":"lunas"}` → buka struk.
+   - **midtrans/xendit** (gateway aktif, lihat [Payment gateway](#payment-gateway-midtrans--xendit)) → check-in `payment.status="pending"` → `POST /penginapan/payments/{id}/pay` → render `qr_string` sebagai QR ke tamu → scan → tunggu webhook → buka struk.
 
 ### Room histories
 
 `GET /penginapan/room-histories` — filter `room_id`, `guest_id`, `status`.
+
+---
+
+## Aktivitas & Log (tampilan user)
+
+Halaman **`GET /activity`** (public, HTML) menampilkan riwayat request milik user: waktu, method, path, status, terautentikasi atau tidak, durasi, IP, skema akses, plus detail **query & body terkirim** (rahasia disamarkan `[REDACTED]`). Token JWT disimpan via `?token=<JWT>` (langsung dari URL) atau tempel manual di halaman (localStorage browser).
+
+`GET /activity/logs` (JWT/BASIC/API key seragam) — API JSON di balik halaman:
+
+| Query | Keterangan |
+|---|---|
+| `limit` / `offset` | `limit` 1–100 (default 20), `offset` default 0 — paginasi |
+| `method` | `GET`/`POST`/`PUT`/`DELETE` |
+| `code` | filter response_code persis (mis. `403`) |
+| `path` | pencarian substring di `uri` |
+| `authorized` | `y` / `n` |
+| `from`, `to` | rentang tanggal `YYYY-MM-DD` (inclusive) |
+| `user_id` | **admin saja** — filter log user tertentu; selain itu user biasa selalu hanya melihat log miliknya (`id_user`-nya sendiri) |
+
+Respons memakai format standar + `pagination` (`page`, `limit`, `total`, `total_pages`); urutan terbaru dulu.
+
+```json
+{ "success": true, "message": "Log aktivitas ditemukan",
+  "data": [ { "id": 64, "uri": "/penginapan/payments", "method": "POST",
+      "params": "{\"query\":\"\",\"body\":\"{\\\"amount\\\":50000}\"}",
+      "ip_address": "127.0.0.1", "rtime": 0.012, "authorized": "y",
+      "response_code": 201, "id_user": 1, "access_by": "bearer_token",
+      "date": "2026-10-15T10:30:00+07:00" } ],
+  "pagination": { "page": 1, "limit": 20, "total": 64, "total_pages": 4 } }
+```
+
+`401` tanpa token / token kedaluwarsa.
 
 ---
 

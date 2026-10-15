@@ -31,6 +31,7 @@ func main() {
 		log.Fatalf("usersDB: %v", err)
 	}
 	db.UsersDB = usersDB
+	auth.SetLogRetention(cfg.LogRetentionDays)
 	auth.SetUsersDB(usersDB)
 
 	mainDB, err := database.ConnectMySQL(cfg.MainDSN)

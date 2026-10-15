@@ -62,41 +62,48 @@ type PenginapanRoom struct {
 func (PenginapanRoom) TableName() string { return "rooms" }
 
 type PenginapanGuest struct {
-	ID           int                 `gorm:"primaryKey;column:id;type:int(11);autoIncrement" json:"id"`
-	RoomID       int                 `gorm:"column:room_id;type:int(11);not null;index" json:"room_id"`
-	Room         *PenginapanRoom     `gorm:"foreignKey:RoomID" json:"room,omitempty"`
-	Name         string              `gorm:"column:name;size:250;not null" json:"name"`
-	Nik          *string             `gorm:"column:nik;size:50" json:"nik"`
-	Gender       string              `gorm:"column:gender;type:enum('pria','wanita');not null" json:"gender"`
-	Harga        int                 `gorm:"column:harga;type:int(11);not null;default:0" json:"harga"`
-	CheckinDate  *time.Time          `gorm:"column:checkin_date;type:date" json:"checkin_date"`
-	CheckinTime  *string             `gorm:"column:checkin_time;type:time(0)" json:"checkin_time"`
-	CheckoutDate *time.Time          `gorm:"column:checkout_date;type:date" json:"checkout_date"`
-	CheckoutTime *string             `gorm:"column:checkout_time;type:time(0)" json:"checkout_time"`
-	UserID       *uint               `gorm:"column:user_id;type:int(11)" json:"user_id"`
-	CreatedAt    time.Time           `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt    time.Time           `gorm:"column:updated_at" json:"updated_at"`
-	TotalBayar   *int                `gorm:"-" json:"total_bayar,omitempty"`
-	Sisa         *int                `gorm:"-" json:"sisa,omitempty"`
-	Lunas        *bool               `gorm:"-" json:"lunas,omitempty"`
+	ID           int             `gorm:"primaryKey;column:id;type:int(11);autoIncrement" json:"id"`
+	RoomID       int             `gorm:"column:room_id;type:int(11);not null;index" json:"room_id"`
+	Room         *PenginapanRoom `gorm:"foreignKey:RoomID" json:"room,omitempty"`
+	Name         string          `gorm:"column:name;size:250;not null" json:"name"`
+	Nik          *string         `gorm:"column:nik;size:50" json:"nik"`
+	Gender       string          `gorm:"column:gender;type:enum('pria','wanita');not null" json:"gender"`
+	Harga        int             `gorm:"column:harga;type:int(11);not null;default:0" json:"harga"`
+	CheckinDate  *time.Time      `gorm:"column:checkin_date;type:date" json:"checkin_date"`
+	CheckinTime  *string         `gorm:"column:checkin_time;type:time(0)" json:"checkin_time"`
+	CheckoutDate *time.Time      `gorm:"column:checkout_date;type:date" json:"checkout_date"`
+	CheckoutTime *string         `gorm:"column:checkout_time;type:time(0)" json:"checkout_time"`
+	UserID       *uint           `gorm:"column:user_id;type:int(11)" json:"user_id"`
+	CreatedAt    time.Time       `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt    time.Time       `gorm:"column:updated_at" json:"updated_at"`
+	TotalBayar   *int            `gorm:"-" json:"total_bayar,omitempty"`
+	Sisa         *int            `gorm:"-" json:"sisa,omitempty"`
+	Lunas        *bool           `gorm:"-" json:"lunas,omitempty"`
 }
 
 func (PenginapanGuest) TableName() string { return "guests" }
 
 type Payment struct {
-	ID              int             `gorm:"primaryKey;column:id;type:int(11);autoIncrement" json:"id"`
-	Amount          int             `gorm:"column:amount;type:int(11);not null;default:0" json:"amount"`
-	PaymentMethodID int             `gorm:"column:payment_method_id;type:int(11);not null" json:"payment_method_id"`
-	PaymentMethod   *PaymentMethod  `gorm:"foreignKey:PaymentMethodID" json:"payment_method,omitempty"`
-	SourceID        int             `gorm:"column:source_id;type:int(11);not null" json:"source_id"`
-	Source          *PurchaseSource `gorm:"foreignKey:SourceID" json:"source,omitempty"`
-	Status          string          `gorm:"column:status;type:enum('pending','lunas','batal');not null;default:pending" json:"status"`
-	Note            *string         `gorm:"column:note;size:250" json:"note"`
-	PaidAt          *time.Time      `gorm:"column:paid_at" json:"paid_at"`
-	UserID          *uint           `gorm:"column:user_id;type:int(11)" json:"user_id"`
-	CreatedAt       time.Time       `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt       time.Time       `gorm:"column:updated_at" json:"updated_at"`
-	Guests          []PaymentGuest  `gorm:"foreignKey:PaymentID" json:"guests,omitempty"`
+	ID               int             `gorm:"primaryKey;column:id;type:int(11);autoIncrement" json:"id"`
+	Amount           int             `gorm:"column:amount;type:int(11);not null;default:0" json:"amount"`
+	PaymentMethodID  int             `gorm:"column:payment_method_id;type:int(11);not null" json:"payment_method_id"`
+	PaymentMethod    *PaymentMethod  `gorm:"foreignKey:PaymentMethodID" json:"payment_method,omitempty"`
+	SourceID         int             `gorm:"column:source_id;type:int(11);not null" json:"source_id"`
+	Source           *PurchaseSource `gorm:"foreignKey:SourceID" json:"source,omitempty"`
+	Status           string          `gorm:"column:status;type:enum('pending','lunas','batal');not null;default:pending" json:"status"`
+	Note             *string         `gorm:"column:note;size:250" json:"note"`
+	PaidAt           *time.Time      `gorm:"column:paid_at" json:"paid_at"`
+	UserID           *uint           `gorm:"column:user_id;type:int(11)" json:"user_id"`
+	Gateway          string          `gorm:"column:gateway;size:20" json:"gateway"`
+	ExternalID       *string         `gorm:"column:external_id;size:100;index" json:"external_id"`
+	QRString         *string         `gorm:"column:qr_string;size:1000" json:"qr_string"`
+	InvoiceURL       *string         `gorm:"column:invoice_url;size:500" json:"invoice_url"`
+	SnapToken        *string         `gorm:"column:snap_token;size:255" json:"snap_token"`
+	GatewayStatus    *string         `gorm:"column:gateway_status;size:30" json:"gateway_status"`
+	GatewayExpiresAt *time.Time      `gorm:"column:gateway_expires_at" json:"gateway_expires_at"`
+	CreatedAt        time.Time       `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt        time.Time       `gorm:"column:updated_at" json:"updated_at"`
+	Guests           []PaymentGuest  `gorm:"foreignKey:PaymentID" json:"guests,omitempty"`
 }
 
 func (Payment) TableName() string { return "payments" }
