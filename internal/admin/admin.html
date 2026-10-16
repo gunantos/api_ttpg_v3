@@ -99,6 +99,19 @@ input:focus,select:focus{border-color:var(--acc)}
   .pre{background:#f8fafc;color:#1f2937;border-color:var(--line)}
   .overlay{background:rgba(255,255,255,.9)}
   tr:hover{background:#f1f4fa}
+
+/* responsive sidebar */
+.sidebar.collapsed{width:72px}
+.sidebar.collapsed .sb-label{display:none}
+.sidebar.collapsed .brand-sub{display:none}
+.sidebar.collapsed nav a{justify-content:center}
+@media(max-width:768px){
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:50;transform:translateX(-100%);transition:transform .25s ease}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar.collapsed{width:250px}
+  #app{padding:12px}
+}
+
 </style>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -108,12 +121,16 @@ input:focus,select:focus{border-color:var(--acc)}
   <aside class="sidebar" id="sidebar" style="display:none">
     <div class="brand"><span class="dot"></span>TTPG Console</div>
     <div class="brand-sub">Aktivitas &amp; log request</div>
+    <div class="flex items-center justify-between mb-4">
+      <span class="text-xs uppercase tracking-widest text-blue-200 sb-label">Menu</span>
+      <button class="btn ghost sm" id="btnSidebarToggle" title="Perkecil sidebar">◀</button>
+    </div>
     <nav class="smenu">
-      <a href="#dashboard" class="on"><span>Dashboard</span></a>
-      <a href="#logs"><span>Log Request</span></a>
-      <a href="#boarding"><span>Boarding Data</span></a>
-      <a href="/docs"><span>API Docs</span></a>
-      <a href="/activity"><span>Log Klasik</span></a>
+      <a href="#" data-view="dashboard" class="on"><span>📊</span> <span class="sb-label">Dashboard</span></a>
+      <a href="#" data-view="logs"><span>📝</span> <span class="sb-label">Log Request</span></a>
+      <a href="#" data-view="boarding"><span>✈️</span> <span class="sb-label">Boarding Data</span></a>
+      <a href="/docs" target="_blank" rel="noopener noreferrer"><span>📄</span> <span class="sb-label">API Docs ↗</span></a>
+      <a href="/activity" target="_blank" rel="noopener noreferrer"><span>📋</span> <span class="sb-label">Log Klasik ↗</span></a>
     </nav>
     <div class="side-foot"><span id="whoamiSide">—</span><button class="btn ghost sm" id="btnLogoutSide">Keluar</button></div>
   </aside>
@@ -144,51 +161,98 @@ input:focus,select:focus{border-color:var(--acc)}
   </div>
 </div>
 
-<div id="app" class="wrap">
-  <div class="grid">
-    <div class="card" style="grid-column:1/-1">
-      <div class="hero" style="justify-content:space-between;flex-wrap:wrap">
-        <div>
-          <div class="big" id="whoami" style="font-size:20px">—</div>
-          <p class="sub" id="whoamiSub">—</p>
+<div id="app" class="flex-1 min-w-0 p-4 md:p-6 lg:p-8" style="display:none">
+  <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <button class="btn" id="btnMobileSidebar" title="Menu">☰</button>
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800" id="viewTitle">Dashboard</h1>
+      <p class="text-sm text-slate-500" id="viewSubtitle">Ringkasan aktivitas &amp; data</p>
+    </div>
+    <button class="btn primary" id="btnReload">Refresh</button>
+  </div>
+
+  <section id="view-dashboard" class="view space-y-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="card">
+        <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide">Total Request</p>
+        <h2 class="text-3xl font-bold text-slate-800 mt-1" id="dashReq">—</h2>
+        <p class="text-xs text-slate-400 mt-1">100 fetch terbaru</p>
+      </div>
+      <div class="card">
+        <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide">Sukses</p>
+        <h2 class="text-3xl font-bold text-green-600 mt-1" id="dashOk">—</h2>
+        <p class="text-xs text-slate-400 mt-1">2xx</p>
+      </div>
+      <div class="card">
+        <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide">Gagal</p>
+        <h2 class="text-3xl font-bold text-red-600 mt-1" id="dashErr">—</h2>
+        <p class="text-xs text-slate-400 mt-1">4xx/5xx</p>
+      </div>
+      <div class="card">
+        <p class="text-xs text-slate-500 font-semibold uppercase tracking-wide">Boarding</p>
+        <h2 class="text-3xl font-bold text-blue-600 mt-1" id="dashBoard">—</h2>
+        <p class="text-xs text-slate-400 mt-1">total data</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="card">
+        <h2 class="mb-3">Status request</h2>
+        <div class="h-56 flex items-center justify-center">
+          <canvas id="chartStatus" class="max-h-56"></canvas>
         </div>
-        <div class="row">
-          <span class="pill ok" id="p_token">token aktif</span>
-          <button class="btn ghost" id="btnLogout">Ganti token</button>
-          <button class="btn primary" id="btnReload">Refresh</button>
+      </div>
+      <div class="card">
+        <h2 class="mb-3">Endpoint paling sering</h2>
+        <div class="h-56 flex items-center justify-center">
+          <canvas id="chartTop" class="max-h-56"></canvas>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Login &amp; info akun</h2>
-      <p class="sub">User aktual dari token (reload otomatis saat token berubah).</p>
+      <h2 class="mb-3">Boarding status</h2>
+      <div class="h-44 flex items-center justify-center">
+        <canvas id="chartBoarding" class="max-h-44"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="mb-2">Ringkasan akun</h2>
       <div id="acct" class="kv"></div>
-      <div class="stat">
-        <div class="box"><b id="st_req">—</b><span>Request Anda</span></div>
-        <div class="box"><b id="st_ok">—</b><span>2xx</span></div>
-        <div class="box"><b id="st_err">—</b><span>4xx/5xx</span></div>
+      <div id="whoamiRow" class="mt-2 text-sm text-slate-600">
+        <span id="whoami"></span> <span id="whoamiSub"></span>
       </div>
     </div>
+  </section>
 
-    <div class="card">
-      <h2>Distribusi endpoint</h2>
-      <p class="sub">Endpoint yang paling banyak Anda panggil (dari log).</p>
-      <div id="toppaths" style="font-size:13px"></div>
+  <section id="view-logs" class="view hidden space-y-4">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="card">
+        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Total Log</p>
+        <h2 class="text-2xl font-bold mt-1" id="logTotal">—</h2>
+      </div>
+      <div class="card">
+        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Sukses</p>
+        <h2 class="text-2xl font-bold text-green-600 mt-1" id="logOk">—</h2>
+      </div>
+      <div class="card">
+        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Ditolak/Err</p>
+        <h2 class="text-2xl font-bold text-red-600 mt-1" id="logErr">—</h2>
+      </div>
     </div>
-
-    <div class="card" style="grid-column:1/-1">
-      <h2>Log request Anda</h2>
-      <p class="sub">Status, data terkirim (ter-redaksi), IP, durasi. Admin melihat semua user + filter.</p>
-      <div class="bar" style="margin-bottom:10px">
-        <input id="fPath" placeholder="cari path…" style="min-width:220px">
+    <div class="card">
+      <h2 class="mb-3">Log Request</h2>
+      <p class="sub text-slate-500 mb-3">Status, data, IP, durasi. Admin melihat semua user + filter.</p>
+      <div class="flex flex-wrap gap-2 mb-3">
+        <input id="fPath" placeholder="cari path…" class="flex-1 min-w-[200px]">
         <select id="fMethod"><option value="">semua method</option><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>
         <select id="fCode"><option value="">semua status</option><option value="200">2xx</option><option value="201">201</option><option value="400">400</option><option value="401">401</option><option value="403">403</option><option value="404">404</option><option value="409">409</option><option value="500">500</option><option value="502">502</option></select>
         <select id="fAuth"><option value="">semua auth</option><option value="y">authorized</option><option value="n">ditolak</option></select>
         <input id="fFrom" type="date">
         <input id="fTo" type="date">
         <button class="btn primary" id="btnF">Terapkan</button>
-        <label style="color:var(--mut);font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="auto"> auto 10s</label>
+        <label class="text-xs text-slate-500 flex gap-1 items-center"><input type="checkbox" id="auto"> auto 10s</label>
         <select id="adminUser" class="hidden"><option value="">semua user</option></select>
       </div>
       <div class="scroll">
@@ -197,15 +261,30 @@ input:focus,select:focus{border-color:var(--acc)}
         <tbody id="rows"></tbody>
       </table>
       </div>
-      <div class="pager"><span id="pageinfo" class="dim"></span><button class="btn" id="prev">Prev</button><button class="btn" id="next">Next</button></div>
+      <div class="pager flex gap-2 items-center justify-end mt-3 text-slate-500 text-sm"><span id="pageinfo"></span><button class="btn" id="prev">Prev</button><button class="btn" id="next">Next</button></div>
     </div>
+  </section>
 
-    <div class="card" style="grid-column:1/-1">
-      <h2>Detail request boarding (payload yang dikirim)</h2>
-      <p class="sub">Setiap create <span class="mono">POST /boarding</span> tercatat di MongoDB <span class="mono">ttpg.boarding</span> — informasi penumpang &amp; tujuan dikirimkan penuh.</p>
-      <div class="bar" style="margin-bottom:10px">
-        <input id="bSearch" placeholder="cari PO / ticket / nopol / nama" style="min-width:240px">
-        <input id="bDest" type="number" placeholder="destination_id">
+  <section id="view-boarding" class="view hidden space-y-4">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="card">
+        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Total Boarding</p>
+        <h2 class="text-2xl font-bold mt-1" id="boardTotal">—</h2>
+      </div>
+      <div class="card">
+        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Active</p>
+        <h2 class="text-2xl font-bold text-green-600 mt-1" id="boardActive">—</h2>
+      </div>
+      <div class="card">
+        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Non-active</p>
+        <h2 class="text-2xl font-bold text-amber-600 mt-1" id="boardInactive">—</h2>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="mb-3">Filter boarding</h2>
+      <div class="flex flex-wrap gap-2 mb-3">
+        <input id="bSearch" placeholder="cari PO / ticket / nopol / nama" class="flex-1 min-w-[240px]">
+        <input id="bDest" type="number" placeholder="destination_id" class="w-40">
         <select id="bStatus"><option value="">semua status</option><option value="active">active</option><option value="non-active">non-active</option></select>
         <button class="btn primary" id="btnB">Cari</button>
       </div>
@@ -215,12 +294,12 @@ input:focus,select:focus{border-color:var(--acc)}
         <tbody id="brows"></tbody>
       </table>
       </div>
-      <div class="pager"><span id="bpageinfo" class="dim"></span><button class="btn" id="bprev">Prev</button><button class="btn" id="bnext">Next</button></div>
+      <div class="pager flex gap-2 items-center justify-end mt-3 text-slate-500 text-sm"><span id="bpageinfo"></span><button class="btn" id="bprev">Prev</button><button class="btn" id="bnext">Next</button></div>
       <div id="bdetail" class="hidden" style="margin-top:12px"></div>
     </div>
-  </div>
+  </section>
 </div>
-
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 let token=''; let limit=20,offset=0, total=0;
@@ -229,7 +308,7 @@ function loadToken(){ try{return localStorage.getItem('ttpg_login_token')||'';}c
 function saveToken(t){ try{localStorage.setItem('ttpg_login_token',t);}catch(e){} }
 function setBanner(msg,err){ const b=$('banner'); b.textContent=msg; b.className='banner show '+(err?'err':'ok'); if(!err) setTimeout(()=>b.classList.remove('show'),4000); }
 function showTokenBox(){ $('loginScreen').classList.remove('hidden'); $('loginScreen').classList.add('flex'); $('app').style.display='none'; document.body.classList.remove('appshow'); }
-function showApp(){ $('loginScreen').classList.add('hidden'); $('loginScreen').classList.remove('flex'); $('app').style.display='block'; document.body.classList.add('appshow'); if($('sidebar')) $('sidebar').style.display=''; refreshAll(); }
+function showApp(){ $('loginScreen').classList.add('hidden'); $('loginScreen').classList.remove('flex'); $('app').style.display='block'; document.body.classList.add('appshow'); if($('sidebar')) $('sidebar').style.display=''; showView('dashboard'); refreshAll(); }
 function setErr(m){ $('loginErr').textContent=m||''; }
 async function api(path, opts){ opts=opts||{}; const h=Object.assign({'Authorization':'Bearer '+token}, opts.headers||{}); const r=await fetch(path,{...opts,headers:h}); if(!r.ok){ const t=await r.text(); throw new Error(r.status+' '+t.slice(0,180)); } const ct=r.headers.get('content-type')||''; if(ct.includes('application/json')) return r.json(); return r.text(); }
 
@@ -246,21 +325,76 @@ async function refreshAll(){
   await fetchLogs();
   await fetchBoarding();
   await fetchStats(uid,role);
+  await fetchBoardingStats();
 }
 
 async function fetchStats(uid,role){
   try{
     const d=await api('/activity/logs?limit=100');
     const rows=d.data||[];
-    $('st_req').textContent=rows.length;
-    $('st_ok').textContent=rows.filter(x=>x.response_code>=200&&x.response_code<300).length;
-    $('st_err').textContent=rows.filter(x=>x.response_code>=400).length;
+    const okc=rows.filter(x=>x.response_code>=200&&x.response_code<300).length;
+    const errc=rows.filter(x=>x.response_code>=400).length;
+    if($('dashReq')) $('dashReq').textContent=rows.length;
+    if($('dashOk')) $('dashOk').textContent=okc;
+    if($('dashErr')) $('dashErr').textContent=errc;
+    if($('logTotal')) $('logTotal').textContent=rows.length;
+    if($('logOk')) $('logOk').textContent=okc;
+    if($('logErr')) $('logErr').textContent=errc;
+    // account box
     // top paths
     const c={}; rows.forEach(x=>{ const k=(x.uri||'').replace(/\?.*/,''); c[k]=(c[k]||0)+1; });
     const sorted=Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,6);
-    $('toppaths').innerHTML = sorted.length? sorted.map(([k,v])=>`<div class="row" style="justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line)"><span class="mono">${esc(k)}</span><b>${v}</b></div>`).join('') : '<span class="dim">belum ada aktivitas</span>';
+    if($('toppaths')) $('toppaths').innerHTML = sorted.length? sorted.map(([k,v])=>`<div class="row" style="justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line)"><span class="mono">${esc(k)}</span><b>${v}</b></div>`).join('') : '<span class="dim">belum ada aktivitas</span>';
+    window.logRows=rows;
+    renderLogCharts(rows, okc, errc);
   }catch(e){}
 }
+
+function destroyChart(key){ if(window._charts && window._charts[key]){ window._charts[key].destroy(); } }
+function renderLogCharts(rows, okc, errc){
+  if(!window.Chart) return;
+  window._charts = window._charts || {};
+  destroyChart('status');
+  destroyChart('top');
+  const ctx1=$('chartStatus'); if(ctx1){
+    window._charts.status=new Chart(ctx1,{type:'doughnut',data:{labels:['Sukses','Gagal'],datasets:[{data:[okc,errc],backgroundColor:['#16a34a','#dc2626']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+  }
+  const c={}; rows.forEach(x=>{ const k=(x.uri||'').replace(/\?.*/,''); c[k]=(c[k]||0)+1; });
+  const sorted=Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const ctx2=$('chartTop'); if(ctx2){
+    window._charts.top=new Chart(ctx2,{type:'bar',data:{labels:sorted.map(x=>x[0]),datasets:[{label:'request',data:sorted.map(x=>x[1]),backgroundColor:'#1e40af'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{display:false}}}}});
+  }
+}
+
+async function fetchBoardingStats(){
+  try{
+    const data=await api('/boarding?limit=500');
+    const rows=data.data||[];
+    const total=(data.pagination&&data.pagination.total!=null)?data.pagination.total:(btotal||rows.length);
+    const active=rows.filter(x=>x.status==='active').length;
+    const inactive=total-active;
+    if($('dashBoard')) $('dashBoard').textContent=total;
+    if($('boardTotal')) $('boardTotal').textContent=total;
+    if($('boardActive')) $('boardActive').textContent=active;
+    if($('boardInactive')) $('boardInactive').textContent=inactive;
+    if(window.Chart){
+      window._charts=window._charts||{};
+      if(window._charts.board) window._charts.board.destroy();
+      const ctx=$('chartBoarding'); if(ctx){ window._charts.board=new Chart(ctx,{type:'pie',data:{labels:['Active','Non-active'],datasets:[{data:[active,inactive],backgroundColor:['#16a34a','#d97706']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}}); }
+    }
+  }catch(e){}
+}
+
+
+
+function showView(name){
+  document.querySelectorAll('.view').forEach(v=>{ v.classList.toggle('hidden', v.id!=='view-'+name); });
+  document.querySelectorAll('[data-view]').forEach(l=>{ l.classList.toggle('on', l.dataset.view===name); });
+  const titles={dashboard:'Dashboard',logs:'Log Request',boarding:'Boarding Data'};
+  if($('viewTitle')) $('viewTitle').textContent=titles[name]||'Dashboard';
+  if($('viewSubtitle')) $('viewSubtitle').textContent = name==='dashboard'?'Ringkasan aktivitas & data':name==='logs'?'Log request & status':'Data boarding & penumpang';
+}
+
 
 async function fetchLogs(){
   const qs=new URLSearchParams();
@@ -365,6 +499,10 @@ $('bnext').onclick=()=>{ boffset+=blimit; fetchBoarding(); };
 
 // wajib login username/password — token lama di localStorage diabaikan
 try{ localStorage.removeItem('ttpg_login_token'); }catch(e){}
+// navigation
+document.querySelectorAll('[data-view]').forEach(l=>{ l.addEventListener('click',e=>{e.preventDefault(); showView(l.dataset.view);}); });
+const _sbBtn=$('btnSidebarToggle'); if(_sbBtn) _sbBtn.addEventListener('click',()=>{ const sb=$('sidebar'); sb.classList.toggle('collapsed'); _sbBtn.textContent=sb.classList.contains('collapsed')?'▶':'◀'; });
+const _mob=$('btnMobileSidebar'); if(_mob) _mob.addEventListener('click',()=>{ const sb=$('sidebar'); sb.classList.toggle('open'); });
 showTokenBox();
 </script>
   </div>
