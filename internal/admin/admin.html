@@ -103,6 +103,7 @@ input:focus,select:focus{border-color:var(--acc)}
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
+<div id="root">
 <div class="layout">
   <aside class="sidebar" id="sidebar" style="display:none">
     <div class="brand"><span class="dot"></span>TTPG Console</div>
@@ -118,13 +119,13 @@ input:focus,select:focus{border-color:var(--acc)}
   </aside>
   <div class="main">
 
-<div id="tokenbox" class="min-h-screen w-full flex items-center justify-center px-4 py-10 bg-slate-100">
-  <div class="w-full max-w-md">
+<div id="loginScreen" class="fixed inset-0 z-50 bg-gradient-to-br from-slate-100 to-blue-50 flex items-center justify-center p-4">
+  <div id="tokenbox" class="w-full max-w-md">
     <div class="text-center mb-8">
       <h1 class="text-3xl font-bold text-slate-800">TTPG <span class="text-blue-600">Console</span></h1>
       <p class="text-sm text-slate-500 mt-1">Masuk dengan username &amp; password</p>
     </div>
-    <div class="bg-white rounded-2xl shadow-xl ring-1 ring-slate-200 p-8">
+    <div class="bg-white rounded-2xl shadow-2xl ring-1 ring-slate-200 p-8">
       <div class="grid gap-4">
         <div class="field">
           <label class="text-xs font-semibold text-slate-500 tracking-wide uppercase mb-1">Username</label>
@@ -136,7 +137,7 @@ input:focus,select:focus{border-color:var(--acc)}
         </div>
         <button id="btnLogin" class="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm transition">Masuk</button>
         <span id="loginErr" class="text-sm text-red-600"></span>
-        <p class="text-xs text-slate-400 text-center">validasi ke <code>ttpg_users.user</code> via POST /auth · role admin wajib</p>
+        <p class="text-xs text-slate-400 text-center">Masuk dengan akun admin</p>
       </div>
     </div>
     <p class="text-center text-xs text-slate-400 mt-6">TTPG Admin Console © 2026</p>
@@ -227,8 +228,8 @@ let blimit=10,boffset=0,btotal=0;
 function loadToken(){ try{return localStorage.getItem('ttpg_login_token')||'';}catch(e){return '';} }
 function saveToken(t){ try{localStorage.setItem('ttpg_login_token',t);}catch(e){} }
 function setBanner(msg,err){ const b=$('banner'); b.textContent=msg; b.className='banner show '+(err?'err':'ok'); if(!err) setTimeout(()=>b.classList.remove('show'),4000); }
-function showTokenBox(){ $('tokenbox').style.display=''; $('app').style.display='none'; document.body.classList.remove('appshow'); }
-function showApp(){ $('tokenbox').style.display='none'; $('app').style.display='block'; document.body.classList.add('appshow'); if($('sidebar')) $('sidebar').style.display=''; refreshAll(); }
+function showTokenBox(){ $('loginScreen').classList.remove('hidden'); $('loginScreen').classList.add('flex'); $('app').style.display='none'; document.body.classList.remove('appshow'); }
+function showApp(){ $('loginScreen').classList.add('hidden'); $('loginScreen').classList.remove('flex'); $('app').style.display='block'; document.body.classList.add('appshow'); if($('sidebar')) $('sidebar').style.display=''; refreshAll(); }
 function setErr(m){ $('loginErr').textContent=m||''; }
 async function api(path, opts){ opts=opts||{}; const h=Object.assign({'Authorization':'Bearer '+token}, opts.headers||{}); const r=await fetch(path,{...opts,headers:h}); if(!r.ok){ const t=await r.text(); throw new Error(r.status+' '+t.slice(0,180)); } const ct=r.headers.get('content-type')||''; if(ct.includes('application/json')) return r.json(); return r.text(); }
 
@@ -367,6 +368,7 @@ try{ localStorage.removeItem('ttpg_login_token'); }catch(e){}
 showTokenBox();
 </script>
   </div>
+</div>
 </div>
 </body>
 </html>
