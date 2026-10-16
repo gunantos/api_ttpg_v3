@@ -100,6 +100,7 @@ input:focus,select:focus{border-color:var(--acc)}
   .overlay{background:rgba(255,255,255,.9)}
   tr:hover{background:#f1f4fa}
 </style>
+<script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
 <div class="layout">
@@ -117,28 +118,28 @@ input:focus,select:focus{border-color:var(--acc)}
   </aside>
   <div class="main">
 
-<div id="tokenbox" class="wrap">
-  <div class="card">
-    <div class="hero">
-      <div>
-        <div class="big">Masuk ke <span class="glow">Console</span></div>
-        <p class="sub">Tempel JWT dari <span class="mono">POST /auth</span>. Token disimpan di browser ini saja (tidak dikirim ke server selain header Authorization).</p>
+<div id="tokenbox" class="min-h-screen w-full flex items-center justify-center px-4 py-10 bg-slate-100">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-bold text-slate-800">TTPG <span class="text-blue-600">Console</span></h1>
+      <p class="text-sm text-slate-500 mt-1">Masuk dengan username &amp; password</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-xl ring-1 ring-slate-200 p-8">
+      <div class="grid gap-4">
+        <div class="field">
+          <label class="text-xs font-semibold text-slate-500 tracking-wide uppercase mb-1">Username</label>
+          <input type="text" id="uInput" placeholder="mis. admin" autocomplete="username" class="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:bg-white transition">
+        </div>
+        <div class="field">
+          <label class="text-xs font-semibold text-slate-500 tracking-wide uppercase mb-1">Password</label>
+          <input type="password" id="pInput" placeholder="••••••••" autocomplete="current-password" class="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:bg-white transition">
+        </div>
+        <button id="btnLogin" class="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm transition">Masuk</button>
+        <span id="loginErr" class="text-sm text-red-600"></span>
+        <p class="text-xs text-slate-400 text-center">validasi ke <code>ttpg_users.user</code> via POST /auth · role admin wajib</p>
       </div>
     </div>
-    <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
-      <div class="field"><label>Username</label><input type="text" id="uInput" placeholder="mis. admin" autocomplete="username"></div>
-      <div class="field"><label>Password</label><input type="password" id="pInput" placeholder="••••••••" autocomplete="current-password"></div>
-    </div>
-    <div class="row">
-      <button class="btn primary" id="btnLogin">Masuk</button>
-    </div>
-    <span id="loginErr" class="err" style="font-size:12px"></span>
-    <p class="dim" style="margin-top:10px;font-size:12px">Login validasi ke tabel <span class="mono">ttpg_users.user</span> via POST /auth. Admin wajib role "admin".</p>
-    <div class="stat">
-      <div class="box"><b id="s_users">—</b><span>Pengguna</span></div>
-      <div class="box"><b id="s_logs">—</b><span>Log hari ini</span></div>
-      <div class="box"><b id="s_ok">—</b><span>2xx</span></div>
-    </div>
+    <p class="text-center text-xs text-slate-400 mt-6">TTPG Admin Console © 2026</p>
   </div>
 </div>
 
