@@ -34,6 +34,9 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 
 	apiKeyAuth := r.Group("", auth.AuthMiddleware())
 	apiKeyAuth.GET("/activity/logs", handler.ListActivityLogs)
+	apiKeyAuth.GET("/vending/config", handler.VendingConfig)
+	apiKeyAuth.POST("/vending/device/status", handler.VendingDeviceStatus)
+	apiKeyAuth.GET("/vending/media", handler.VendingMedia)
 	apiKeyAuth.POST("/gate", handler.Gate)
 	apiKeyAuth.POST("/checkin-mandiri", handler.CheckinMandiri)
 	apiKeyAuth.GET("/boardingpass", handler.List)

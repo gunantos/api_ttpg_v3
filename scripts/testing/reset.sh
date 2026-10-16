@@ -2,6 +2,8 @@
 set -e
 docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg -e "TRUNCATE terminal_boardingpass; TRUNCATE tbl_tujuan; TRUNCATE tbl_po;" 2>/dev/null
 docker exec -i ttpg-mysql mysql -uroot -proot -h127.0.0.1 --force ttpg < $(dirname "$0")/ttpg_schema.sql 2>/dev/null || true
+docker exec -i ttpg-mysql mysql -uroot -proot -h127.0.0.1 --force ttpg < $(dirname "$0")/../../migrations/mysql/006_create_ttpg_vending.sql 2>/dev/null
+docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg -e "TRUNCATE vending_machines; TRUNCATE vending_media; DELETE FROM vending_configs WHERE machine_id<>'__global__';" 2>/dev/null
 docker exec -i ttpg-mysql mysql -uroot -proot -h127.0.0.1 --force < $(dirname "$0")/../../migrations/mysql/004_create_ttpg_users.sql 2>/dev/null
 docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 -e "GRANT ALL PRIVILEGES ON ttpg_users.* TO 'api2'@'%'" 2>/dev/null
 docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg_users -e "UPDATE user SET po_id='' WHERE username='admin'" 2>/dev/null

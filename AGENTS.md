@@ -9,7 +9,7 @@ go build ./...
 go vet ./...
 ```
 
-Smoke test end-to-end (Docker MySQL+Mongo lokal, 315 assert) ada di `scripts/testing/` — jalankan `reset.sh`, `test_api.sh`, `test_env_flags.sh`, `test_penginapan.sh`, `reset.sh`, `test_ws.sh` (lihat `scripts/testing/README.md`; reset di awal & sebelum ws WAJIB — fixture basi membuat FAIL palsu). Jangan jalankan skrip test terhadap DB produksi (`192.168.1.3`).
+Smoke test end-to-end (Docker MySQL+Mongo lokal, 352 assert) ada di `scripts/testing/` — jalankan `reset.sh`, `test_api.sh`, `test_env_flags.sh`, `test_penginapan.sh`, `reset.sh`, `test_ws.sh` (lihat `scripts/testing/README.md`; reset di awal & sebelum ws WAJIB — fixture basi membuat FAIL palsu). Jangan jalankan skrip test terhadap DB produksi (`192.168.1.3`).
 
 ## Lingkungan
 
@@ -38,7 +38,7 @@ internal/
   platform/auth/             # JWT, bcrypt login, Basic, AuthMiddleware (SERAGAM: Bearer/Basic/X-ttpg-key|X-API-Key) + rules.go (aturan api_url/access, log async)
   platform/database/         # ConnectMySQL, ConnectMongo
   handler/                   # gate, boardingpass, checkin_mandiri, print_boardingpass,
-                             # penginapan_config, penginapan_master, penginapan_guest, penginapan_payment, penginapan_receipt, penginapan_gateway, activity, ws
+                             # penginapan_config, penginapan_master, penginapan_guest, penginapan_payment, penginapan_receipt, penginapan_gateway, activity, vending, ws
   payment/                     # Gateway interface + registry pluggable; midtrans.go (POST /qris + SHA512 verify), xendit.go (POST /qr-codes + X-Callback-Token)
                              # (ws.go: hub WebSocket + broadcast event kamar/tamu)
   docs/                      # api.html (docs interaktif /docs, di-embed via docs.go)
@@ -47,7 +47,7 @@ internal/
   routes/routes.go           # semua registrasi route
   repositories/, services/   # (kosong, placeholder)
 scripts/testing/             # smoke test lokal: reset.sh, test_api.sh, test_env_flags.sh, test_penginapan.sh, test_ws.sh + wsclient/ (jangan arahkan ke DB produksi)
-migrations/mysql/            # 001_create_ttpg_auth.sql, 002_create_ttpg_penginapan.sql (skema canonical penginapan + seed), 003_upgrade_penginapan_v2.sql (upgrade skema lama, tanpa DROP data), 004_create_ttpg_users.sql (skema auth + seed lokal; dimuat reset.sh, TIDAK untuk produksi), 005_upgrade_payments_gateway.sql (ALTER kolom gateway payments — jalankan manual di produksi bila perlu)
+migrations/mysql/            # 001_create_ttpg_auth.sql, 002_create_ttpg_penginapan.sql (skema canonical penginapan + seed), 003_upgrade_penginapan_v2.sql (upgrade skema lama, tanpa DROP data), 004_create_ttpg_users.sql (skema auth + seed lokal; dimuat reset.sh, TIDAK untuk produksi), 005_upgrade_payments_gateway.sql (ALTER kolom gateway payments — jalankan manual di produksi bila perlu), 006_create_ttpg_vending.sql (tabel vending di DB `ttpg`: machines/configs/media + seed config global; dimuat reset.sh, jalankan manual di produksi)
 ```
 
 ## Konvensi
@@ -57,7 +57,7 @@ migrations/mysql/            # 001_create_ttpg_auth.sql, 002_create_ttpg_pengina
   1. `internal/pkg/response` (`response.Success` / `response.Error`) → untuk `POST /auth`, `/tujuan`, `/po`, `/boarding*`, **seluruh `/penginapan/*`**. Shape: `{success, message, data, pagination?, errors?}`. (Satu-satunya pengecualian 200 OK: `GET /penginapan/payments/:id/receipt` mengembalikan HTML struk; error-nya tetap format standar.)
   2. Format mentah handler gate/boardingpass/checkin (`gin.H` atau struct `internal/response`) → untuk `/gate`, `/checkin-mandiri`, `/boardingpass*`, `/boarding/print`. Jangan dibungkus format standar.
 - Akses DB:
-  - Query mentah `db.DB` (*sql.DB) untuk `terminal_boardingpass` dan `tbl_tujuan`.
+  - Query mentah `db.DB` (*sql.DB) untuk `terminal_boardingpass`, `tbl_tujuan` dan tabel vending (`vending_machines`/`vending_configs`/`vending_media`).
   - GORM via `mainDB` (parameter `routes.RegisterRoutes`) untuk `tbl_po`, `/tujuan`.
   - `auth.AuthDB` (GORM) untuk `users`/`api_keys` — **legacy saja**; auth memakai `auth.UsersDB` (`ttpg_users`: user/access/api_url/logs).
   - `db.MongoClient.Database(config.C.MongoDatabase).Collection(...)` untuk Mongo.
@@ -78,7 +78,7 @@ Di `internal/routes/routes.go`:
 3. `GET /docs` — **public**; halaman dokumentasi interaktif (embed `internal/docs/api.html`; update juga `docs/api.md` bila endpoint berubah). `GET /activity` — **public**; halaman UI log (embed `internal/activity/activity.html`; data via `GET /activity/logs` dengan `?token=`/tempel token).
 4. `GET /penginapan/payments/:id/receipt` — **public, tanpa auth** (struk HTML 78mm; dibuka via `window.open`/`?autoprint=1` seperti `/boarding/print`, jadi tidak boleh masuk group JWT).
 5. `POST /penginapan/webhooks/midtrans` + `POST /penginapan/webhooks/xendit` — **public** (dipanggil gateway tanpa auth; daftar di root `r` untuk menghindari konflik static/param gin); response format standar; signature/token diverifikasi di handler.
-6. Group `auth.AuthMiddleware()` (seragam — satunya middleware untuk semua route protected; ganti `middleware.ApiKeyAuth` lama): `GET /activity/logs`, `POST /gate`, `POST /checkin-mandiri`, `GET /boardingpass` (list), `GET/POST /boardingpass`, `GET/PUT/DELETE /boardingpass/:id`.
+6. Group `auth.AuthMiddleware()` (seragam — satunya middleware untuk semua route protected; ganti `middleware.ApiKeyAuth` lama): `GET /activity/logs`, `GET /vending/config`, `POST /vending/device/status`, `GET /vending/media`, `POST /gate`, `POST /checkin-mandiri`, `GET /boardingpass` (list), `GET/POST /boardingpass`, `GET/PUT/DELETE /boardingpass/:id`.
 7. `POST /auth` (login → JWT; `GET /auth/key` sudah DIHAPUS).
 8. Group `auth.AuthMiddleware()` — `GET /tujuan`, `GET /po`, `GET/POST/PUT/DELETE /boarding*`.
 9. Group `peng := r.Group("/penginapan")` + `auth.AuthMiddleware()` — configs, **`GET /qris`**, payment-methods, purchase-sources, locations, rooms (+`PUT /rooms/:id/status`), room-layouts, guests (+`/guests/:id/checkout`, `/guests/:id/pindah`, `/guests/:id/histories`), payments (+`POST /payments/:id/pay`), **`GET /payment-gateway`**, room-histories.
@@ -99,7 +99,7 @@ Di `internal/routes/routes.go`:
 - **Penginapan** (`handler/penginapan_*.go`, DB `ttpg_penginapan`):
   - Lunas = Σ alokasi dari payment `status='lunas'` ≥ `harga` tamu; `pending` tidak dihitung.
   - 1 payment bisa menutup banyak tamu: wajib `allocations` (total = `amount`); 1 tamu → alokasi otomatis.
-  - `rooms.current_occupants` + `status` disinkronkan dalam transaksi (`adjustRoomOccupancy`); check-in tolak (409) bila kapasitas penuh/maintenance.
+  - `rooms.current_occupants` + `status` disinkronkan dalam transaksi (`adjustRoomOccupancy`); check-in tolak (409) bila kapasitas penuh/maintenance. **Field turunan `available`** di SEMUA response kamar (list/detail/CRUD/status, `room` embedded tamu/layout, event WS): custom `MarshalJSON` di `models.PenginapanRoom` — `available = status=='kosong' && current_occupants < capacity` (definisi "kamar kosong", dipilih user; kamar `terisi` berslot TIDAK dianggap available). Jangan tambahkan field ini manual di handler — otomatis ikut serialisasi.
   - Pindah kamar: update `room_id` in-place + history `pindah` (note `"lama -> baru"`); tidak ada baris tamu baru.
   - Checkout: isi `checkout_date`/`checkout_time` + history `check-out`; ganda → 409.
   - `DELETE` payment = void → `status='batal'` (409 bila sudah batal); `PUT` payment `amount` < total alokasi → 409.
@@ -110,6 +110,8 @@ Di `internal/routes/routes.go`:
   - QRIS: `GET /penginapan/qris` (JWT) membaca config `qris_payload` (wajib; string EMV QR statis/URL) + opsional `qris_merchant`; belum diisi → 404 `NOT_CONFIGURED` dengan detail cara konfigurasi. Alur: check-in `payment.status=pending` → tampilkan QR → `PUT /payments/:id {"status":"lunas"}` → struk.
   - Payment gateway QRIS (`penginapan_gateway.go` + `internal/payment/`): provider = config `payment_gateway` (`midtrans`/`xendit`, kosong = nonaktif). Kredensial juga dari config (`midtrans_server_key/env/api_url`, `xendit_secret_key/callback_token/api_url`, `payment_gateway_callback_url`). **Alur QRIS langsung** (bukan Snap/Invoice): `POST /payments/:id/pay` charge → response `qr_string` (frontend render QR) → simpan `gateway/external_id/qr_string/gateway_status` (idempoten bila pending belum expired); `404 NOT_CONFIGURED`, `409` lunas/batal, `502 GATEWAY_ERROR`. Midtrans pakai `POST /qris`, Xendit pakai `POST /qr-codes` (dynamic). Webhook public (root `r`): Midtrans verify SHA512(order_id+gross_amount+status_code+server_key), status `settlement/capture` → **lunas**+`paid_at`, `cancel/deny/expire` → `gateway_status` saja; Xendit verify header `X-Callback-Token`, `PAID/SETTLED` → lunas (fallback `reference_id`). `gross_amount` ≠ `amount` → 403; signature salah → 401; unknown `external_id` → 404; ganda → 200 idempoten. **VA belum didukung** (Charge Type=`va` → error "fokus QRIS") — nanti VA cukup kembalikan kode VA saja. Provider baru: tambah file di `internal/payment/` + `Register` di `init()`, cukupkan kasus di `gatewaySettingsFor` — tanpa ubah handler. Kolom di `payments` (`qr_string` dst.) juga di-DLL `002` + upgrade `005_upgrade_payments_gateway.sql`. Test section J pakai mock HTTP lokal (`*_api_url` → 127.0.0.1:18080, butuh `python3`).
 
+  - Vending (`handler/vending.go`, DB `ttpg`, migration `006`): `GET /vending/config?machine_id=` → bundle merge **server-side** (baris `__global__` + override per mesin; objek direkursif, array/scalar diganti; `version`/`updated_at` dari baris yang menang) — client TIDAK merge lokal; `machine_id` belum ada → auto-register `status=pending` (juga via heartbeat); `POST /vending/device/status` (heartbeat 30 detik: `app_version`/`config_version`/`last_sync_at` RFC3339/`extra` objek maks 8KB → `last_seen_at=NOW()`, **tidak mengubah `status`**); `GET /vending/media` hanya `enabled=1` urut `order`. Seed config global ada di `006` (jangan dihapus — config endpoint 500 tanpanya). Test section J `test_api.sh`.
+
 ## Pekerjaan belum selesai (lanjutkan bila diminta)
 
-- Test runtime sudah dilakukan via `scripts/testing/` (315 assert: 157 API + 5 env-flag + 139 penginapan + 14 WS, Docker lokal) terhadap semua endpoint yang ada; sisa yang belum teruji: jalur sukses fallback API tiket & Damri (butuh akses jaringan keluar), charge sungguhan ke API Midtrans/Xendit (test memakai mock lokal).
+- Test runtime sudah dilakukan via `scripts/testing/` (352 assert: 187 API + 5 env-flag + 146 penginapan + 14 WS, Docker lokal) terhadap semua endpoint yang ada; sisa yang belum teruji: jalur sukses fallback API tiket & Damri (butuh akses jaringan keluar), charge sungguhan ke API Midtrans/Xendit (test memakai mock lokal).

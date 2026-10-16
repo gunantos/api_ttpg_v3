@@ -35,6 +35,16 @@ sqlu() {
   docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg_users -N -e "$1" 2>/dev/null | tr -d '\r'
 }
 
+sq() {
+  local name="$1" expected="$2" got
+  got=$(sqlq "$3")
+  if [ "$got" = "$expected" ]; then
+    PASS=$((PASS+1)); echo "PASS  $name"
+  else
+    FAIL=$((FAIL+1)); echo "FAIL  $name -> '$got' (expect '$expected')"
+  fi
+}
+
 echo "===== A. AUTH ====="
 req "login salah password -> 401" POST /auth 401 -H 'Content-Type: application/json' -d '{"username":"admin","password":"salah"}'
 ja "  format error standar" '.success == false'
@@ -266,6 +276,53 @@ req "GET /activity/logs?limit=3" GET "/activity/logs?limit=3" 200 -H "Authorizat
 ja "  maksimal 3" '(.data | length) <= 3 and .pagination.limit == 3'
 req "GET /activity/logs (limited) -> 200" GET /activity/logs 200 -H "Authorization: Bearer $LTOKEN"
 ja "  hanya log miliknya (id_user=2)" 'all(.data[]; .id_user == 2)'
+
+echo "===== J. VENDING ====="
+sqlq "DELETE FROM vending_configs WHERE machine_id IN ('PENDING_1','HEART_1')" >/dev/null
+sqlq "DELETE FROM vending_machines WHERE machine_id IN ('PENDING_1','HEART_1')" >/dev/null
+sqlq "DELETE FROM vending_media" >/dev/null
+
+req "vending/config tanpa auth -> 401" GET "/vending/config?machine_id=PENDING_1" 401
+req "vending/config tanpa machine_id -> 400" GET /vending/config 400 -H "$KEY"
+ja "  pesan machine_id" '.success == false and (.message | contains("machine_id"))'
+req "vending/config PENDING_1 -> 200 (auto-register)" GET "/vending/config?machine_id=PENDING_1" 200 -H "$KEY"
+ja "  bundle valid utk client (object + idle + attract + sources[])" '.success == true and (.data|type)=="object" and (.data.idle|type)=="object" and (.data.attract|type)=="object" and (.data.attract.sources|type)=="array" and (.data.version != null) and (.data.updated_at != null)'
+ja "  default global" '.data.ocr.language == "eng+ind" and .data.idle.minutes == 3 and .data.idle.enabled == true and .data.media_cache_limit_mb == 500 and .data.speech.model == "whisper-small" and .data.speech.language == "id" and .data.cameras.ktp == null'
+sq "auto-register status pending" "1" "SELECT COUNT(*) FROM vending_machines WHERE machine_id='PENDING_1' AND status='pending'"
+
+sqlq "INSERT INTO vending_configs (machine_id, version, payload) VALUES ('PENDING_1','cfg-test-1','{\"idle\":{\"minutes\":7},\"attract\":{\"sources\":[\"http://127.0.0.1:9/fake.mp4\"]}}')" >/dev/null
+req "config dgn override -> 200" GET "/vending/config?machine_id=PENDING_1" 200 -H "$KEY"
+ja "  versi override menang" '.data.version == "cfg-test-1"'
+ja "  deep merge idle: minutes=7, enabled global tetap" '.data.idle.minutes == 7 and .data.idle.enabled == true'
+ja "  array diganti, objek global bertahan" '.data.attract.sources[0] == "http://127.0.0.1:9/fake.mp4" and .data.attract.mode == "hybrid" and .data.ocr.language == "eng+ind"'
+
+req "heartbeat tanpa auth -> 401" POST /vending/device/status 401
+req "heartbeat tanpa machine_id -> 400" POST /vending/device/status 400 -H "$KEY" -H 'Content-Type: application/json' -d '{"app_version":"1.0"}'
+ja "  pesan machine_id" '.success == false and (.message | contains("machine_id"))'
+req "heartbeat PENDING_1 -> 200" POST /vending/device/status 200 -H "$KEY" -H 'Content-Type: application/json' -d '{"machine_id":"PENDING_1","app_version":"2.2.1-a","config_version":"cfg-20261015-1","last_sync_at":"2026-10-15T10:00:00.000Z","extra":{"idle":7,"person_present":true}}'
+ja "  echo machine_id + status" '.success == true and .data.machine_id == "PENDING_1" and .data.status == "pending"'
+sq "app_version+config_version tersimpan" "2.2.1-a|cfg-20261015-1" "SELECT CONCAT(app_version,'|',config_version) FROM vending_machines WHERE machine_id='PENDING_1'"
+sq "extra (objek) tersimpan" "7" "SELECT JSON_EXTRACT(extra,'$.idle') FROM vending_machines WHERE machine_id='PENDING_1'"
+sq "last_sync_at + last_seen_at terisi" "1" "SELECT COUNT(*) FROM vending_machines WHERE machine_id='PENDING_1' AND last_sync_at IS NOT NULL AND last_seen_at IS NOT NULL"
+req "heartbeat last_sync_at bukan RFC3339 -> 400" POST /vending/device/status 400 -H "$KEY" -H 'Content-Type: application/json' -d '{"machine_id":"PENDING_1","last_sync_at":"15-10-2026"}'
+req "heartbeat extra non-objek -> 400" POST /vending/device/status 400 -H "$KEY" -H 'Content-Type: application/json' -d '{"machine_id":"PENDING_1","extra":"bukan-objek"}'
+ja "  pesan extra" '.success == false and (.message | contains("extra"))'
+req "heartbeat auto-register HEART_1 -> 200" POST /vending/device/status 200 -H "$KEY" -H 'Content-Type: application/json' -d '{"machine_id":"HEART_1","app_version":"0.1"}'
+sq "HEART_1 dibuat pending" "1" "SELECT COUNT(*) FROM vending_machines WHERE machine_id='HEART_1' AND status='pending'"
+sqlq "UPDATE vending_machines SET status='active' WHERE machine_id='PENDING_1'" >/dev/null
+req "heartbeat lagi (status aktif tak diubah) -> 200" POST /vending/device/status 200 -H "$KEY" -H 'Content-Type: application/json' -d '{"machine_id":"PENDING_1","app_version":"2.2.1-b"}'
+sq "status tetap active" "active" "SELECT status FROM vending_machines WHERE machine_id='PENDING_1'"
+sq "app_version ter-update" "2.2.1-b" "SELECT app_version FROM vending_machines WHERE machine_id='PENDING_1'"
+
+req "vending/media tanpa auth -> 401" GET /vending/media 401
+sqlq "INSERT INTO vending_media (type,url,\`order\`,checksum) VALUES ('video','http://127.0.0.1:9/a.mp4',1,'sha256:aaa'),('image','http://127.0.0.1:9/b.jpg',2,'sha256:bbb')" >/dev/null
+sqlq "INSERT INTO vending_media (type,url,\`order\`,enabled) VALUES ('video','http://127.0.0.1:9/c.mp4',3,0)" >/dev/null
+req "vending/media -> 200" GET /vending/media 200 -H "$KEY"
+ja "  2 item enabled, urut by order, format sesuai" '.success == true and (.data|length)==2 and .data[0].type=="video" and .data[0].url=="http://127.0.0.1:9/a.mp4" and .data[0].order==1 and .data[0].checksum=="sha256:aaa" and .data[1].type=="image" and .data[1].order==2'
+
+sqlq "DELETE FROM vending_configs WHERE machine_id IN ('PENDING_1','HEART_1')" >/dev/null
+sqlq "DELETE FROM vending_machines WHERE machine_id IN ('PENDING_1','HEART_1')" >/dev/null
+sqlq "DELETE FROM vending_media" >/dev/null
 
 echo ""
 echo "================================"

@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type PenginapanConfig struct {
 	IDConfigs    int       `gorm:"primaryKey;column:id_configs;type:int(11);autoIncrement" json:"id_configs"`
@@ -60,6 +63,14 @@ type PenginapanRoom struct {
 }
 
 func (PenginapanRoom) TableName() string { return "rooms" }
+
+func (r PenginapanRoom) MarshalJSON() ([]byte, error) {
+	type alias PenginapanRoom
+	return json.Marshal(struct {
+		alias
+		Available bool `json:"available"`
+	}{alias(r), r.Status == "kosong" && r.CurrentOccupants < r.Capacity})
+}
 
 type PenginapanGuest struct {
 	ID           int             `gorm:"primaryKey;column:id;type:int(11);autoIncrement" json:"id"`

@@ -21,6 +21,9 @@ Sumber kebenaran route: `internal/routes/routes.go`. **Update file ini setiap ad
 | GET | `/docs` | Tanpa auth (public) — halaman dokumentasi interaktif (HTML, contoh kode cURL/PHP/Python/Node/Go) |
 | GET | `/activity` | Tanpa auth (public) — halaman riwayat log request user (HTML; data diambil via `?token=`) |
 | GET | `/activity/logs` | Seragam† — API log (JSON, paginasi + filter) |
+| GET | `/vending/config?machine_id=` | Seragam† — bundle config mesin (auto-register) |
+| POST | `/vending/device/status` | Seragam† — heartbeat mesin (30 detik) |
+| GET | `/vending/media` | Seragam† — katalog media attract (opsional) |
 | POST | `/gate` | Seragam† |
 | POST | `/checkin-mandiri` | Seragam† |
 | GET | `/boardingpass` | Seragam† |
@@ -445,7 +448,7 @@ Aturan bisnis:
 
 - **Lunas**: total alokasi dari payment berstatus `lunas` ≥ `harga` tamu. Payment `pending` **tidak dihitung**.
 - **Satu payment → banyak tamu**: wajib `allocations` (`guest_index` saat check-in / `guest_id` saat manual); total alokasi = `amount` payment. 1 tamu → alokasi otomatis.
-- **Occupancy** `rooms.current_occupants` + `status` (`kosong`/`terisi`/`maintenance`) disinkronkan dalam transaksi.
+- **Occupancy** `rooms.current_occupants` + `status` (`kosong`/`terisi`/`maintenance`) disinkronkan dalam transaksi. Ketersediaan client baca field turunan `available` di response kamar (lihat [Locations, rooms](#locations-rooms-room-layouts)).
 - **Pindah kamar** mengubah `room_id` tamu in-place + history `pindah` (note `lama -> baru`); checkout mengisi `checkout_date`/`checkout_time` + history `check-out`.
 
 ### Configs & lookups
@@ -460,6 +463,23 @@ Aturan bisnis:
 
 - `GET/POST/PUT/DELETE /penginapan/locations[/:id]` — `name`, `keterangan`.
 - `GET/POST/PUT/DELETE /penginapan/rooms[/:id]` — `location_id`, `room_number` (unik per lokasi), `room_type` (`pria`/`wanita`), `capacity`. `GET /rooms` filter: `status`, `location_id`, `room_type`.
+- **Field turunan `available`** di **semua** objek kamar (list/detail/CRUD/status, `room` embedded di tamu/layout, event WS): `true` bila `status=kosong` dan `current_occupants < capacity` — client cukup membaca field ini untuk ketersediaan (implementasi: custom `MarshalJSON` di `PenginapanRoom`, otomatis ikut serialisasi). Contoh respons `GET /penginapan/rooms`:
+
+```json
+{
+  "success": true,
+  "message": "Data kamar ditemukan",
+  "data": [
+    {
+      "id": 1, "location_id": 1,
+      "room_number": "201", "room_type": "pria",
+      "capacity": 2, "current_occupants": 1,
+      "status": "terisi", "available": false,
+      "location": {"id": 1, "name": "Gedung A"}
+    }
+  ]
+}
+```
 - `PUT /penginapan/rooms/:id/status` — `{"status": "kosong"|"terisi"|"maintenance"}`.
 - `DELETE /rooms` ditolak (409) bila ada tamu aktif.
 - `GET/POST/PUT/DELETE /penginapan/room-layouts[/:id]` — `location_id`, `room_id`, `row_number`, `urutan`; `GET` filter `location_id` (preload `location`, `room`).
@@ -470,7 +490,7 @@ Aturan bisnis:
 
 ```json
 { "id": 1, "room_id": 1, "name": "Budi", "harga": 100000,
-  "room": { "room_number": "201" },
+  "room": { "room_number": "201", "available": false },
   "total_bayar": 100000, "sisa": 0, "lunas": true }
 ```
 
@@ -631,6 +651,82 @@ Respons memakai format standar + `pagination` (`page`, `limit`, `total`, `total_
 
 ---
 
+## Vending (mesin OTOMAT)
+
+Tiga endpoint untuk client mesin (auth seragam† — contoh memakai `X-TTPG-KEY`). Data di DB `ttpg`: `vending_machines`, `vending_configs`, `vending_media` — migration `migrations/mysql/006_create_ttpg_vending.sql` (**jalankan manual di produksi**, lokal otomatis via `reset.sh`).
+
+**Auto-register**: `machine_id` yang belum ada di `vending_machines` dibuat otomatis dengan `status=pending` (approve mesin via admin panel — menyusul); heartbeat pun begitu.
+
+**Config bundle** disimpan per baris: global `machine_id='__global__'` (di-seed migration: versi `cfg-20261015-1`, `updated_at` 2026-10-15 10:00:00) + opsional baris override per mesin. **Server yang meng-merge** (client tidak merge lokal): objek di-merge rekursif (field global yang tidak di-override tetap), array/scalar diganti oleh override; `version`/`updated_at` diambil dari baris override bila ada, selain itu dari global.
+
+**Perilaku client**: setiap sync sukses (interval otomatis **5 menit**; manual `window.VENDING_CONFIG.sync()` atau panel admin) menyimpan `version`, mengunduh media (Bagian C), lalu mem-broadcast event `config_updated` ke renderer. **Validasi client** (gagal → fallback cache): root bertipe objek, `idle` objek, `attract` objek, dan `attract.sources` array.
+
+### GET `/vending/config`
+
+```http
+GET /vending/config?machine_id=PENDING_1
+X-TTPG-KEY: <key>
+Content-Type: application/json
+```
+
+`machine_id` wajib (400 bila kosong). Response (dibungkus `data`):
+
+```json
+{
+  "version": "cfg-20261015-1",
+  "updated_at": "2026-10-15T10:00:00Z",
+  "cameras": {"ktp": null, "person": null},
+  "ocr": {"crop": null, "language": "eng+ind", "confidence_min": 0.7},
+  "idle": {"minutes": 3, "enabled": true},
+  "attract": {"mode": "hybrid", "sources": []},
+  "speech": {"enabled": true, "model": "whisper-small", "language": "id"},
+  "media_cache_limit_mb": 500
+}
+```
+
+`cameras`/`ocr`/`idle`/`attract`/`speech`/`media_cache_limit_mb` = payload merge (bukan konstanta — bisa di-override per mesin). `sources` berisi URL media attract (diisi admin; juga tersedia via `GET /vending/media`). Setiap sync ikut memperbarui `last_seen_at` + `config_version` mesin.
+
+### POST `/vending/device/status` (Heartbeat)
+
+```http
+POST /vending/device/status
+X-TTPG-KEY: <key>
+Content-Type: application/json
+```
+
+```json
+{
+  "machine_id": "PENDING_1",
+  "app_version": "2.2.1-a",
+  "config_version": "cfg-20261015-1",
+  "last_sync_at": "2026-10-15T10:00:00.000Z",
+  "extra": {"idle": 7, "person_present": true, "errors": []}
+}
+```
+
+| Field | Wajib | Ket |
+|---|---|---|
+| `machine_id` | ya | auto-register bila belum ada |
+| `app_version` | tidak | versi aplikasi mesin (maks 30 char) |
+| `config_version` | tidak | versi config yang dipakai client (maks 50 char) |
+| `last_sync_at` | tidak | RFC3339 — salah format → 400 |
+| `extra` | tidak | objek JSON bebas (idle/person_present/errors, maks 8KB); non-objek → 400 |
+
+Interval otomatis **30 detik**. Heartbeat mengisi `last_seen_at` (server time) dan tidak mengubah `status` mesin. Response: `data` `{machine_id, status}`.
+
+### GET `/vending/media` (opsional)
+
+Daftar konten attract — client boleh langsung memakai `attract.sources` dari bundle config; endpoint ini untuk pemisahan katalog media bila diperlukan. Hanya `enabled=1`, urut `order`.
+
+```json
+{ "success": true, "message": "Daftar media attract",
+  "data": [ {"id": 1, "type": "video", "url": "https://.../a.mp4", "order": 1, "checksum": "sha256:..."} ] }
+```
+
+`401` tanpa key/token (ketiga endpoint).
+
+---
+
 ## WebSocket
 
 ### GET `/ws?token=<JWT>`
@@ -640,12 +736,12 @@ Endpoint public untuk real-time update penginapan. Token JWT (hasil login `POST 
 Format pesan (server → client):
 
 ```json
-{"type": "room", "data": {"action": "status", "room": {"id": 1, "room_number": "201", "status": "maintenance", "current_occupants": 0, "location": {...}}}}
+{"type": "room", "data": {"action": "status", "room": {"id": 1, "room_number": "201", "status": "maintenance", "current_occupants": 0, "available": false, "location": {...}}}}
 ```
 
 | `type` | `action` | `data` |
 |--------|----------|--------|
-| `room` | `create` / `update` / `status` / `occupancy` | `room` — objek kamar lengkap (preload `location`), berisi `current_occupants` terbaru |
+| `room` | `create` / `update` / `status` / `occupancy` | `room` — objek kamar lengkap (preload `location`), berisi `current_occupants` terbaru + `available` (turunan ketersediaan) |
 | `room` | `delete` | `room_id` (int) |
 | `guest` | `checkin` / `checkout` / `pindah` | `guest_ids` (array int) |
 

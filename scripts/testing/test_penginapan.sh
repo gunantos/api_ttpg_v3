@@ -58,6 +58,7 @@ req "POST room 202 cap2 -> 201" POST /penginapan/rooms 201 -H "Authorization: Be
 R2=$(jget .data.id)
 req "POST room 203 cap1 -> 201" POST /penginapan/rooms 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "{\"location_id\":$LOC_ID,\"room_number\":\"203\",\"room_type\":\"wanita\",\"capacity\":1}"
 R3=$(jget .data.id)
+ja "  room baru: available=true" '.data.available == true'
 req "POST room 204 cap2 -> 201" POST /penginapan/rooms 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "{\"location_id\":$LOC_ID,\"room_number\":\"204\",\"room_type\":\"pria\",\"capacity\":2}"
 R4=$(jget .data.id)
 req "nomor kamar duplikat -> 500 (unique)" POST /penginapan/rooms 500 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "{\"location_id\":$LOC_ID,\"room_number\":\"201\",\"room_type\":\"pria\"}"
@@ -85,16 +86,21 @@ req "total alloc != amount -> 400" POST /penginapan/guests 400 -H "Authorization
 req "melebihi kapasitas (3 di kap1) -> 409" POST /penginapan/guests 409 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d "{\"guests\":[{\"room_id\":$R3,\"name\":\"X\",\"gender\":\"wanita\",\"harga\":1},{\"room_id\":$R3,\"name\":\"Y\",\"gender\":\"wanita\",\"harga\":1}]}"
 req "room maintenance -> 409" PUT "/penginapan/rooms/$R3/status" 200 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"status":"maintenance"}'
+ja "  maintenance → available=false" '.data.available == false'
 req "check-in ke maintenance -> 409" POST /penginapan/guests 409 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d "{\"guests\":[{\"room_id\":$R3,\"name\":\"Z\",\"gender\":\"wanita\",\"harga\":1}]}"
 req "GET rooms: occupancy R1=1 terisi" GET /penginapan/rooms 200 -H "Authorization: Bearer $TOKEN"
 ja "  R1 occupant 1" ".data[] | select(.id==$R1) | .current_occupants == 1 and .status == \"terisi\""
 ja "  R2 occupant 2" ".data[] | select(.id==$R2) | .current_occupants == 2"
+ja "  R1 available=false (terisi)" ".data[] | select(.id==$R1) | .available == false"
+ja "  R2 available=false (penuh)" ".data[] | select(.id==$R2) | .available == false"
+ja "  R3 available=false (maintenance)" ".data[] | select(.id==$R3) | .available == false"
 
 echo "===== F. TAMU & PEMBAYARAN ====="
 req "GET guests inhouse -> 3" GET /penginapan/guests?status=inhouse 200 -H "Authorization: Bearer $TOKEN"
 ja "  jumlah 3 + summary" '(.data | length) == 3 and (.data[0] | has("lunas"))'
 req "GET guest G1 lunas" GET "/penginapan/guests/$G1" 200 -H "Authorization: Bearer $TOKEN"
+ja "  room embedded available=false (terisi)" '.data.room.room_number == "201" and .data.room.available == false'
 ja "  lunas true" '.data.lunas == true and .data.room.room_number == "201"'
 req "PUT guest harga 120000 -> lunas false" PUT "/penginapan/guests/$G1" 200 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"harga":120000}'
 req "GET G1 setelah update" GET "/penginapan/guests/$G1" 200 -H "Authorization: Bearer $TOKEN"
@@ -123,6 +129,7 @@ req "checkout G1 -> 200" POST "/penginapan/guests/$G1/checkout" 200 -H "Authoriz
 req "checkout lagi -> 409" POST "/penginapan/guests/$G1/checkout" 409 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{}'
 req "R1 kosong setelah checkout" GET /penginapan/rooms 200 -H "Authorization: Bearer $TOKEN"
 ja "  R1 occupant 0 kosong" ".data[] | select(.id==$R1) | .current_occupants == 0 and .status == \"kosong\""
+ja "  R1 available=true (kosong lagi)" ".data[] | select(.id==$R1) | .available == true"
 req "check-in GX ke R1 -> 201" POST /penginapan/guests 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d "{\"guests\":[{\"room_id\":$R1,\"name\":\"Pindah Guy\",\"gender\":\"pria\",\"harga\":50000}]}"
 GX=$(jget .data.guests[0].id)
