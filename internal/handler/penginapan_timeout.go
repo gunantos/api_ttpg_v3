@@ -36,17 +36,17 @@ func paymentHoldMinutes() int {
 // yang lebih tua dari hold: payment → 'batal' + tamu terkait yang belum lunas
 // di-check-out otomatis (kamar kembali available). Payment yang sudah di-charge
 // gateway (kolom gateway terisi) TIDAK disentuh — expiry-nya urusan provider.
-func sweepPendingCashPayments(now time.Time) {
+
+func sweepPendingCashPayments() {
 	hold := paymentHoldMinutes()
 	if hold <= 0 || db.PenginapanDB == nil {
 		return
 	}
-	cutoff := now.Add(-time.Duration(hold) * time.Minute)
 	var pays []models.Payment
 	if err := db.PenginapanDB.Model(&models.Payment{}).
 		Joins("JOIN payment_methods pm ON pm.id = payments.payment_method_id").
 		Where("payments.status = ?", "pending").
-		Where("payments.created_at < ?", cutoff).
+		Where("payments.created_at < (NOW() - INTERVAL ? MINUTE)", hold).
 		Where("pm.code = ?", "cash").
 		Where("(payments.gateway IS NULL OR payments.gateway = '')").
 		Find(&pays).Error; err != nil {
@@ -54,7 +54,7 @@ func sweepPendingCashPayments(now time.Time) {
 		return
 	}
 	for i := range pays {
-		voidTimedOutPayment(&pays[i], now)
+		voidTimedOutPayment(&pays[i], time.Now())
 	}
 }
 
@@ -155,7 +155,7 @@ func StartPaymentTimeoutSweeper() {
 					logger.Error("payment timeout sweeper panic: %v", r)
 				}
 			}()
-			sweepPendingCashPayments(time.Now())
+			sweepPendingCashPayments()
 		}()
 		time.Sleep(time.Minute)
 	}

@@ -524,7 +524,7 @@ const GROUPS = [
     {code:401, label:"Signature salah", example:{success:false, message:"Signature/token webhook tidak valid", errors:[{code:"INVALID_SIGNATURE", detail:"…"}]}},
     {code:403, label:"Jumlah tidak sesuai", example:{success:false, message:"Jumlah pembayaran tidak sesuai", errors:[{code:"AMOUNT_MISMATCH", detail:"gateway=1 pembayaran=50000"}]}},
     {code:404, label:"external_id tak dikenal", example:{success:false, message:"Pembayaran dengan external_id tersebut tidak ditemukan"}}]},
- {id:"p-wh-xendit", method:"POST", path:"/penginapan/webhooks/xendit", auth:"none", desc:"Public — callback pembayaran Xendit QR Code (POST /qr_codes, dynamic; charge memakai Basic auth + api-version 2022-07-31). Verifikasi header X-Callback-Token = config xendit_callback_token. PAID/SETTLED → lunas; FAILED/EXPIRED → gateway_status saja (payment tetap pending).",
+ {id:"p-wh-xendit", method:"POST", path:"/penginapan/webhooks/xendit", auth:"none", desc:"Public — callback pembayaran Xendit QR Code (POST /qr_codes, dynamic; charge memakai Basic auth + api-version 2022-07-31). Midtrans charge via POST /v2/charge (body payment_type qris + transaction_details). Verifikasi header X-Callback-Token = config xendit_callback_token. PAID/SETTLED → lunas; FAILED/EXPIRED → gateway_status saja (payment tetap pending).",
   body:{example:{external_id:"TPG-PAY-6-1760500100", status:"PAID", amount:60000, paid_at:"2026-10-15T12:05:00+07:00"}},
   responses:[
     {code:200, label:"OK", example:{success:true, message:"Webhook diproses", data:{status:"ok", payment_id:6, payment_status:"lunas"}}},
