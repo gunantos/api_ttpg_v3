@@ -77,6 +77,7 @@ CREATE TABLE guests (
   room_id INT(11) NOT NULL,
   name VARCHAR(250) NOT NULL,
   nik VARCHAR(50) NULL,
+  ktp_photo VARCHAR(250) NULL,
   gender ENUM('pria','wanita') NOT NULL,
   harga INT(11) NOT NULL DEFAULT 0,
   checkin_date DATE NULL,

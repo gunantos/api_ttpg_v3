@@ -48,6 +48,7 @@ Sumber kebenaran route: `internal/routes/routes.go`. **Update file ini setiap ad
 | GET/POST/PUT | `/penginapan/guests`, `/penginapan/guests/:id` (GET/PUT/POST via sub-path) | JWT (AuthMiddleware) |
 | POST | `/penginapan/guests/:id/checkout`, `/penginapan/guests/:id/pindah` | JWT (AuthMiddleware) |
 | GET | `/penginapan/guests/:id/histories` | JWT (AuthMiddleware) |
+| POST/GET/DELETE | `/penginapan/guests/:id/ktp` | JWT (AuthMiddleware) — foto KTP (multipart file ≤5MB; GET = bytes gambar; hapus) |
 | GET/POST/PUT/DELETE | `/penginapan/payments[/:id]` | JWT (AuthMiddleware) |
 | POST | `/penginapan/payments/:id/pay` | JWT — buat tagihan payment gateway (Midtrans/Xendit) |
 | GET | `/penginapan/payment-gateway` | JWT — info gateway aktif (provider, configured) |
@@ -489,7 +490,7 @@ Aturan bisnis:
 `GET /penginapan/guests` — filter `status=inhouse|out`, `room_id`, `checkin_date` (limit 500). Setiap tamu disertai summary pembayaran:
 
 ```json
-{ "id": 1, "room_id": 1, "name": "Budi", "harga": 100000,
+{ "id": 1, "room_id": 1, "name": "Budi", "nik": "3175...", "ktp_photo": null, "harga": 100000,
   "room": { "room_number": "201", "available": false },
   "total_bayar": 100000, "sisa": 0, "lunas": true }
 ```
@@ -541,6 +542,8 @@ Error: `400` validasi/alokasi, `404` room tidak ada, `409` kapasitas penuh / mai
 `POST /penginapan/guests/:id/pindah` — `{"room_id": 4}` → `{"guest_id", "room_lama", "room_baru"}`. `400` kamar sama, `409` penuh/maintenance.
 
 `GET /penginapan/guests/:id/histories` — history `check-in`/`check-out`/`pindah` tamu.
+
+**Foto KTP**: `POST /penginapan/guests/:id/ktp` — multipart form-field `file` (JPG/PNG/WebP, maks 5MB) → `{"guest_id","ktp_photo"}`; upload ulang mengganti file lama. `GET .../ktp` — bytes gambar (butuh JWT; tampilkan via fetch-blob, bukan `<img src>`); `404` bila belum ada. `DELETE .../ktp` — hapus foto. Nama file dibuat server, disimpan di `$UPLOAD_DIR/ktp` (default `./uploads/ktp`).
 
 ### Payments
 

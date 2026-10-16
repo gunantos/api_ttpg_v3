@@ -101,6 +101,25 @@ req "GET guests inhouse -> 3" GET /penginapan/guests?status=inhouse 200 -H "Auth
 ja "  jumlah 3 + summary" '(.data | length) == 3 and (.data[0] | has("lunas"))'
 req "GET guest G1 lunas" GET "/penginapan/guests/$G1" 200 -H "Authorization: Bearer $TOKEN"
 ja "  room embedded available=false (terisi)" '.data.room.room_number == "201" and .data.room.available == false'
+echo "===== F2. FOTO KTP ====="
+printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' | base64 -d > /tmp/opencode/ktp_test.png
+req "upload foto KTP G1 -> 200" POST "/penginapan/guests/$G1/ktp" 200 -H "Authorization: Bearer $TOKEN" -F "file=@/tmp/opencode/ktp_test.png;type=image/png"
+ja "  guest_id + nama file .png" ".data.guest_id == $G1 and (.data.ktp_photo | endswith(\".png\"))"
+req "GET foto KTP G1 -> 200" GET "/penginapan/guests/$G1/ktp" 200 -H "Authorization: Bearer $TOKEN"
+KTP_CT=$(curl -s -m 10 -D - -o /dev/null "$BASE/penginapan/guests/$G1/ktp" -H "Authorization: Bearer $TOKEN" | tr -d '\r' | grep -i '^content-type:' | head -1)
+case "$KTP_CT" in *image/png*) PASS=$((PASS+1)); echo "PASS  content-type image/png";; *) FAIL=$((FAIL+1)); echo "FAIL  content-type: $KTP_CT";; esac
+req "detail G1 memuat ktp_photo" GET "/penginapan/guests/$G1" 200 -H "Authorization: Bearer $TOKEN"
+ja "  ktp_photo terisi" '.data.ktp_photo != null'
+printf 'bukan-gambar' > /tmp/opencode/ktp_bad.txt
+req "upload file non-gambar -> 400" POST "/penginapan/guests/$G1/ktp" 400 -H "Authorization: Bearer $TOKEN" -F "file=@/tmp/opencode/ktp_bad.txt;type=text/plain"
+ja "  pesan format" '.message | contains("JPG")'
+req "upload tanpa file -> 400" POST "/penginapan/guests/$G1/ktp" 400 -H "Authorization: Bearer $TOKEN"
+req "GET KTP tanpa foto (G2A) -> 404" GET "/penginapan/guests/$G2A/ktp" 404 -H "Authorization: Bearer $TOKEN"
+req "DELETE foto KTP G1 -> 200" DELETE "/penginapan/guests/$G1/ktp" 200 -H "Authorization: Bearer $TOKEN"
+req "GET KTP setelah delete -> 404" GET "/penginapan/guests/$G1/ktp" 404 -H "Authorization: Bearer $TOKEN"
+req "detail setelah delete -> 200" GET "/penginapan/guests/$G1" 200 -H "Authorization: Bearer $TOKEN"
+ja "  ktp_photo null" '.data.ktp_photo == null'
+echo "===== F3. TAMU & PEMBAYARAN ====="
 ja "  lunas true" '.data.lunas == true and .data.room.room_number == "201"'
 req "PUT guest harga 120000 -> lunas false" PUT "/penginapan/guests/$G1" 200 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"harga":120000}'
 req "GET G1 setelah update" GET "/penginapan/guests/$G1" 200 -H "Authorization: Bearer $TOKEN"

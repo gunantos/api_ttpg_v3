@@ -27,6 +27,7 @@ type Config struct {
 	DamriTimeoutSeconds         int
 	IgnoredMongoUserIDs         []int
 	LogRetentionDays            int
+	UploadDir                   string
 }
 
 var C *Config
@@ -40,6 +41,7 @@ func Load() *Config {
 		MongoURI:      getEnv("MONGO_URI", "mongodb://admin:Andtho1989@192.168.1.3:27017/?authSource=admin&directConnection=true"),
 		JWTSecret:     getEnv("JWT_SECRET", "ttpg-secret-key-change-in-production"),
 		Port:          getEnv("PORT", "3080"),
+		UploadDir:     getEnv("UPLOAD_DIR", "uploads"),
 
 		Bypass:                      getEnv("BYPASS", "false") == "true",
 		APIKey:                      getEnv("API_KEY", "12345"),

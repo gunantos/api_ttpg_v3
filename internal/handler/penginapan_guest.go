@@ -1,13 +1,18 @@
 package handler
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/andtho89/ttpg/internal/config"
 	"github.com/andtho89/ttpg/internal/db"
 	"github.com/andtho89/ttpg/internal/logger"
 	"github.com/andtho89/ttpg/internal/models"
@@ -634,4 +639,128 @@ func ListRoomHistories(c *gin.Context) {
 		return
 	}
 	response.Success(c, http.StatusOK, "History kamar ditemukan", data, nil)
+}
+
+const ktpMaxBytes = 5 << 20
+
+func ktpDir() string {
+	return filepath.Join(config.C.UploadDir, "ktp")
+}
+
+func ktpRandomName(guestID int, ext string) string {
+	b := make([]byte, 4)
+	rand.Read(b)
+	return fmt.Sprintf("%d_%d_%s.%s", guestID, time.Now().Unix(), hex.EncodeToString(b), ext)
+}
+
+func UploadGuestKTP(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "id tidak valid", nil)
+		return
+	}
+	var guest models.PenginapanGuest
+	if err := db.PenginapanDB.First(&guest, id).Error; err != nil {
+		response.Error(c, http.StatusNotFound, "Tamu tidak ditemukan", nil)
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, ktpMaxBytes+1024)
+	file, err := c.FormFile("file")
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "file wajib dikirim (multipart form-field 'file')", nil)
+		return
+	}
+	if file.Size > ktpMaxBytes {
+		response.Error(c, http.StatusBadRequest, "ukuran foto maksimal 5MB", nil)
+		return
+	}
+	f, err := file.Open()
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "gagal membaca file: "+err.Error(), nil)
+		return
+	}
+	defer f.Close()
+	head := make([]byte, 512)
+	n, _ := f.Read(head)
+	var ext string
+	switch http.DetectContentType(head[:n]) {
+	case "image/jpeg":
+		ext = "jpg"
+	case "image/png":
+		ext = "png"
+	case "image/webp":
+		ext = "webp"
+	default:
+		response.Error(c, http.StatusBadRequest, "format foto harus JPG, PNG, atau WebP", nil)
+		return
+	}
+	if err := os.MkdirAll(ktpDir(), 0o755); err != nil {
+		response.Error(c, http.StatusInternalServerError, "gagal membuat folder upload: "+err.Error(), nil)
+		return
+	}
+	filename := ktpRandomName(guest.ID, ext)
+	if err := c.SaveUploadedFile(file, filepath.Join(ktpDir(), filename)); err != nil {
+		response.Error(c, http.StatusInternalServerError, "gagal menyimpan file: "+err.Error(), nil)
+		return
+	}
+	if guest.KTPPhoto != nil && *guest.KTPPhoto != "" {
+		os.Remove(filepath.Join(ktpDir(), filepath.Base(*guest.KTPPhoto)))
+	}
+	if err := db.PenginapanDB.Model(&guest).Update("ktp_photo", filename).Error; err != nil {
+		response.Error(c, http.StatusInternalServerError, "gagal menyimpan data foto: "+err.Error(), nil)
+		return
+	}
+	response.Success(c, http.StatusOK, "Foto KTP tersimpan", gin.H{"guest_id": guest.ID, "ktp_photo": filename}, nil)
+}
+
+func GetGuestKTP(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "id tidak valid", nil)
+		return
+	}
+	var guest models.PenginapanGuest
+	if err := db.PenginapanDB.First(&guest, id).Error; err != nil {
+		response.Error(c, http.StatusNotFound, "Tamu tidak ditemukan", nil)
+		return
+	}
+	if guest.KTPPhoto == nil || *guest.KTPPhoto == "" {
+		response.Error(c, http.StatusNotFound, "Foto KTP belum ada", nil)
+		return
+	}
+	name := filepath.Base(*guest.KTPPhoto)
+	if name != *guest.KTPPhoto {
+		response.Error(c, http.StatusInternalServerError, "nama file foto tidak valid", nil)
+		return
+	}
+	path := filepath.Join(ktpDir(), name)
+	if _, err := os.Stat(path); err != nil {
+		response.Error(c, http.StatusNotFound, "File foto tidak ditemukan", nil)
+		return
+	}
+	c.Header("Cache-Control", "private, max-age=86400")
+	c.File(path)
+}
+
+func DeleteGuestKTP(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "id tidak valid", nil)
+		return
+	}
+	var guest models.PenginapanGuest
+	if err := db.PenginapanDB.First(&guest, id).Error; err != nil {
+		response.Error(c, http.StatusNotFound, "Tamu tidak ditemukan", nil)
+		return
+	}
+	if guest.KTPPhoto == nil || *guest.KTPPhoto == "" {
+		response.Error(c, http.StatusNotFound, "Foto KTP belum ada", nil)
+		return
+	}
+	os.Remove(filepath.Join(ktpDir(), filepath.Base(*guest.KTPPhoto)))
+	if err := db.PenginapanDB.Model(&guest).Update("ktp_photo", nil).Error; err != nil {
+		response.Error(c, http.StatusInternalServerError, "gagal menghapus data foto: "+err.Error(), nil)
+		return
+	}
+	response.Success(c, http.StatusOK, "Foto KTP dihapus", gin.H{"guest_id": guest.ID, "ktp_photo": nil}, nil)
 }

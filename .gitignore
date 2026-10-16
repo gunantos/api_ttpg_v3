@@ -13,3 +13,6 @@ ttpg_server
 # Env lokal (jangan commit secret)
 .env
 .env.*
+
+# Upload (foto KTP penginapan)
+uploads/

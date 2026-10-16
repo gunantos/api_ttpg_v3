@@ -78,6 +78,7 @@ type PenginapanGuest struct {
 	Room         *PenginapanRoom `gorm:"foreignKey:RoomID" json:"room,omitempty"`
 	Name         string          `gorm:"column:name;size:250;not null" json:"name"`
 	Nik          *string         `gorm:"column:nik;size:50" json:"nik"`
+	KTPPhoto     *string         `gorm:"column:ktp_photo;size:250" json:"ktp_photo"`
 	Gender       string          `gorm:"column:gender;type:enum('pria','wanita');not null" json:"gender"`
 	Harga        int             `gorm:"column:harga;type:int(11);not null;default:0" json:"harga"`
 	CheckinDate  *time.Time      `gorm:"column:checkin_date;type:date" json:"checkin_date"`

@@ -387,6 +387,9 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 	peng.POST("/guests/:id/checkout", handler.CheckoutPenginapan)
 	peng.POST("/guests/:id/pindah", handler.PindahKamarPenginapan)
 	peng.GET("/guests/:id/histories", handler.ListGuestHistories)
+	peng.POST("/guests/:id/ktp", handler.UploadGuestKTP)
+	peng.GET("/guests/:id/ktp", handler.GetGuestKTP)
+	peng.DELETE("/guests/:id/ktp", handler.DeleteGuestKTP)
 
 	peng.GET("/payments", handler.ListPayments)
 	peng.GET("/payments/:id", handler.GetPayment)

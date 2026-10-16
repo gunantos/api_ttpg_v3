@@ -41,6 +41,9 @@ Kode HTTP yang akan Anda temui: `400` data tidak valid · `401` token salah/keda
 | POST | `/penginapan/guests/:id/checkout` | Check-out |
 | POST | `/penginapan/guests/:id/pindah` | Pindah kamar |
 | GET | `/penginapan/guests/:id/histories` | History tamu (check-in/out/pindah) |
+| POST | `/penginapan/guests/:id/ktp` | Upload foto KTP (multipart `file`, maks 5MB) |
+| GET | `/penginapan/guests/:id/ktp` | Ambil foto KTP (bytes gambar, perlu auth) |
+| DELETE | `/penginapan/guests/:id/ktp` | Hapus foto KTP |
 | GET | `/penginapan/room-histories?room_id=` | History per kamar |
 | GET | `/penginapan/payments` | List pembayaran (`?guest_id=`, `?status=`) |
 | GET/PUT/DELETE | `/penginapan/payments/:id` | Detail / update / void |
@@ -129,7 +132,8 @@ GET /penginapan/guests?room_id=1&checkin_date=2026-10-16
 Maks 500 baris. Setiap tamu memuat `room` (lengkap, termasuk `available`) + ringkasan pembayaran:
 
 ```json
-{ "id": 1, "room_id": 1, "name": "Budi", "gender": "pria", "harga": 100000,
+{ "id": 1, "room_id": 1, "name": "Budi", "nik": "3175...", "ktp_photo": "1_1760..._a1b2c3d4.png",
+  "gender": "pria", "harga": 100000,
   "checkin_date": "2026-10-16", "checkin_time": "14:00:00", "checkout_date": null,
   "room": {"room_number": "201", "status": "terisi", "available": false},
   "total_bayar": 100000, "sisa": 0, "lunas": true }
@@ -197,7 +201,34 @@ POST /penginapan/payments/3/pay            → {"data":{"external_id":"...","qr_
 
 Alur frontend: check-in dengan `payment.status=pending` → tampilkan QR (`qr_string` dari `/qris` statis **atau** hasil `POST /payments/:id/pay`) → tunggu admin lunasi (`PUT .../status lunas`) atau webhook gateway (otomatis) → tampilkan struk. `configured:false` → sembunyikan opsi bayar QRIS. Charge ulang payment yang sudah lunas → 409 `PAYMENT_PAID`.
 
-## 8. WebSocket (update real-time)
+## 8. Foto KTP (opsional)
+
+Upload setelah check-in (guest id sudah ada). Field `ktp_photo` di response tamu = nama file, `null` = belum ada.
+
+```http
+POST /penginapan/guests/:id/ktp        # multipart form-field "file", JPG/PNG/WebP, maks 5MB
+GET  /penginapan/guests/:id/ktp        # bytes gambar (Content-Type: image/*)
+DELETE /penginapan/guests/:id/ktp
+```
+
+```bash
+curl -X POST "$BASE/penginapan/guests/1/ktp" \
+  -H "Authorization: Bearer $JWT" \
+  -F "file=@/path/foto_ktp.jpg;type=image/jpeg"
+# → {"success":true,"data":{"guest_id":1,"ktp_photo":"1_1760..._a1b2c3d4.png"}}
+```
+
+- Upload ulang **mengganti** foto lama (file lama dihapus otomatis).
+- **Tampilkan gambar**: `<img>` tidak bisa kirim header auth → fetch sebagai blob dulu:
+
+```js
+const res = await fetch(`${BASE}/penginapan/guests/${id}/ktp`, { headers: { Authorization: `Bearer ${token}` } });
+if (res.ok) img.src = URL.createObjectURL(await res.blob());   // 404 = belum ada foto
+```
+
+- Error: 400 bukan gambar/tanpa file/kebesaran · 404 tamu belum ada foto atau file hilang dari disk.
+
+## 9. WebSocket (update real-time)
 
 ```js
 const ws = new WebSocket(`ws://${host}/ws?token=${JWT}`);   // auth via query
@@ -222,3 +253,4 @@ Setelah event `room` → refresh panel kamar; setelah `guest` → refresh daftar
 5. **Time**: request check-in menerima `checkin_date` `"YYYY-MM-DD"` dan `checkin_time` `"HH:MM"`; response memakai `"HH:MM:SS"` + timestamp RFC3339 (`created_at` dst).
 6. **Nominal** = integer rupiah (tanpa desimal). `amount` pembayaran saat check-in wajib ≥ 1.
 7. List tamu maks 500 baris (filter dulu per `room_id`/`status`/`checkin_date` bila perlu). List rooms/payments tanpa paginasi.
+8. **Foto KTP** disimpan di server (`$UPLOAD_DIR/ktp`, default `./uploads/ktp` relatif terhadap CWD server) dengan nama file dibuat server (`<guest_id>_<ts>_<rand>.<ext>`) — nama dari client diabaikan. Ganti foto = file lama dihapus. `GET .../ktp` butuh JWT (KTP = data sensitif); tampilkan via fetch-blob, bukan `<img src>` polos.

@@ -426,12 +426,12 @@ const GROUPS = [
   params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}]}
 ]},
 {id:"pg-guest", title:"Penginapan — Tamu (Check-in/Out)", items:[
- {id:"g-list", method:"GET", path:"/penginapan/guests", auth:"jwt", desc:"List tamu + summary pembayaran (total_bayar, sisa, lunas) + room. Limit 500.",
+ {id:"g-list", method:"GET", path:"/penginapan/guests", auth:"jwt", desc:"List tamu + summary pembayaran (total_bayar, sisa, lunas) + room + nik + ktp_photo (nama file foto KTP, null = belum ada). Limit 500.",
   params:[
     {name:"status", in:"query", type:"string", req:false, desc:"inhouse | out"},
     {name:"room_id", in:"query", type:"int", req:false, desc:"—"},
     {name:"checkin_date", in:"query", type:"string", req:false, desc:"YYYY-MM-DD"}],
-  responses:[{code:200, label:"OK", example:{success:true, message:"Data tamu ditemukan", data:[{id:1, room_id:1, name:"Budi", gender:"pria", harga:100000, checkin_date:"2026-10-13T00:00:00Z", checkin_time:"14:00:00", checkout_date:null, room:{room_number:"201", status:"terisi", available:false}, total_bayar:100000, sisa:0, lunas:true}]}}]},
+  responses:[{code:200, label:"OK", example:{success:true, message:"Data tamu ditemukan", data:[{id:1, room_id:1, name:"Budi", nik:"3273…", ktp_photo:"1_1760…_a1b2c3d4.png", gender:"pria", harga:100000, checkin_date:"2026-10-13T00:00:00Z", checkin_time:"14:00:00", checkout_date:null, room:{room_number:"201", status:"terisi", available:false}, total_bayar:100000, sisa:0, lunas:true}]}}]},
  {id:"g-get", method:"GET", path:"/penginapan/guests/:id", auth:"jwt", desc:"Detail tamu + room + summary.",
   params:[{name:"id", in:"path", type:"int", req:true, desc:"id tamu"}]},
  {id:"g-checkin", method:"POST", path:"/penginapan/guests", auth:"jwt", desc:"Check-in transaksional: N tamu + payment opsional (allocations total = amount; 1 tamu → alokasi otomatis). Occupancy kamar disinkron; 409 bila penuh/maintenance.",
@@ -455,7 +455,18 @@ const GROUPS = [
              {code:400, label:"Sama", example:{success:false, message:"room_id sama dengan kamar saat ini"}}]},
  {id:"g-hist", method:"GET", path:"/penginapan/guests/:id/histories", auth:"jwt", desc:"History tamu: check-in / check-out / pindah.",
   params:[{name:"id", in:"path", type:"int", req:true, desc:"id tamu"}],
-  responses:[{code:200, label:"OK", example:{success:true, message:"History tamu ditemukan", data:[{id:9, guest_id:1, room_id:1, status:"check-in", note:"mulai menginap", occurred_at:"2026-10-13T07:00:00Z"}, {id:10, guest_id:1, status:"pindah", note:"201 -> 302", occurred_at:"2026-10-13T09:00:00Z"}]}}]}
+  responses:[{code:200, label:"OK", example:{success:true, message:"History tamu ditemukan", data:[{id:9, guest_id:1, room_id:1, status:"check-in", note:"mulai menginap", occurred_at:"2026-10-13T07:00:00Z"}, {id:10, guest_id:1, status:"pindah", note:"201 -> 302", occurred_at:"2026-10-13T09:00:00Z"}]}}]},
+ {id:"g-ktp-upload", method:"POST", path:"/penginapan/guests/:id/ktp", auth:"jwt", desc:"Upload foto KTP (multipart form-field \"file\"; JPG/PNG/WebP; maks 5MB; nama file dibuat server; upload ulang mengganti file lama). Response: guest_id + ktp_photo.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id tamu"}],
+  responses:[
+    {code:200, label:"OK", example:{success:true, message:"Foto KTP tersimpan", data:{guest_id:1, ktp_photo:"1_1760…_a1b2c3d4.png"}}},
+    {code:400, label:"Bukan gambar", example:{success:false, message:"format foto harus JPG, PNG, atau WebP"}}]},
+ {id:"g-ktp-get", method:"GET", path:"/penginapan/guests/:id/ktp", auth:"jwt", desc:"Ambil foto KTP (bytes gambar, Content-Type image/*). Butuh JWT — tampilkan via fetch-blob (URL.createObjectURL), bukan <img src> polos. 404 bila belum ada / file hilang.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id tamu"}],
+  responses:[{code:200, label:"OK", example:{note:"bytes gambar (binary) — Content-Type: image/jpeg|png|webp"}}, {code:404, label:"Belum ada", example:{success:false, message:"Foto KTP belum ada"}}]},
+ {id:"g-ktp-delete", method:"DELETE", path:"/penginapan/guests/:id/ktp", auth:"jwt", desc:"Hapus foto KTP (file dihapus dari disk, kolom dikosongkan).",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id tamu"}],
+  responses:[{code:200, label:"OK", example:{success:true, message:"Foto KTP dihapus", data:{guest_id:1, ktp_photo:null}}}]}
 ]},
 {id:"pg-pay", title:"Penginapan — Pembayaran & History", items:[
  {id:"p-list", method:"GET", path:"/penginapan/payments", auth:"jwt", desc:"List payment (preload guests, source, payment_method). Lunas = Σ alokasi status=lunas ≥ harga tamu; pending tidak dihitung.",
