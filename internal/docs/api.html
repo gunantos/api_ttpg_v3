@@ -387,7 +387,7 @@ const GROUPS = [
   body:{example:{name:"Gedung A (Baru)"}}},
  {id:"loc-delete", method:"DELETE", path:"/penginapan/locations/:id", auth:"jwt", desc:"Hapus lokasi.",
   params:[{name:"id", in:"path", type:"int", req:true, desc:"id"}]},
- {id:"room-list", method:"GET", path:"/penginapan/rooms", auth:"jwt", desc:"List kamar + location preload + current_occupants. room_number unik per lokasi (index komposit). Field turunan <code>available</code>: true bila status=kosong (dan penghuni &lt; kapasitas) — client cukup baca field ini untuk ketersediaan; tersedia di SEMUA objek kamar (list/detail/CRUD/status, room embedded di tamu/layout, event WS).",
+ {id:"room-list", method:"GET", path:"/penginapan/rooms", auth:"jwt", desc:"List kamar + location preload + current_occupants. room_number unik per lokasi (index komposit). Field turunan <code>available</code>: true bila status=kosong (dan penghuni &lt; kapasitas) — client cukup baca field ini untuk ketersediaan; tersedia di SEMUA objek kamar (list/detail/CRUD/status, room embedded di tamu/layout, event WS). <b>Aturan UI check-in:</b> semua kamar selalu ditampilkan; kamar dengan room_type &ne; gender tamu → disabled (bukan warna hijau, tidak bisa diklik); hijau &amp; bisa diklik hanya room_type sama dengan gender tamu + available:true.",
   params:[
     {name:"status", in:"query", type:"string", req:false, desc:"kosong | terisi | maintenance"},
     {name:"location_id", in:"query", type:"int", req:false, desc:"—"},
@@ -469,7 +469,7 @@ const GROUPS = [
   responses:[{code:200, label:"OK", example:{success:true, message:"Foto KTP dihapus", data:{guest_id:1, ktp_photo:null}}}]}
 ]},
 {id:"pg-pay", title:"Penginapan — Pembayaran & History", items:[
- {id:"p-list", method:"GET", path:"/penginapan/payments", auth:"jwt", desc:"List payment (preload guests, source, payment_method). Lunas = Σ alokasi status=lunas ≥ harga tamu; pending tidak dihitung.",
+ {id:"p-list", method:"GET", path:"/penginapan/payments", auth:"jwt", desc:"List payment (preload guests, source, payment_method). Lunas = Σ alokasi status=lunas ≥ harga tamu; pending tidak dihitung. <b>Hold cash:</b> payment pending metode cash tanpa gateway otomatis batal + tamu belum lunas di-check-out setelah config payment_hold_minutes (default 15 menit, 0 = nonaktif; sweep tiap 60 detik) → kamar available + event WS.",
   params:[
     {name:"guest_id", in:"query", type:"int", req:false, desc:"—"},
     {name:"status", in:"query", type:"string", req:false, desc:"pending | lunas | batal"},
@@ -524,7 +524,7 @@ const GROUPS = [
     {code:401, label:"Signature salah", example:{success:false, message:"Signature/token webhook tidak valid", errors:[{code:"INVALID_SIGNATURE", detail:"…"}]}},
     {code:403, label:"Jumlah tidak sesuai", example:{success:false, message:"Jumlah pembayaran tidak sesuai", errors:[{code:"AMOUNT_MISMATCH", detail:"gateway=1 pembayaran=50000"}]}},
     {code:404, label:"external_id tak dikenal", example:{success:false, message:"Pembayaran dengan external_id tersebut tidak ditemukan"}}]},
- {id:"p-wh-xendit", method:"POST", path:"/penginapan/webhooks/xendit", auth:"none", desc:"Public — callback pembayaran Xendit QR Code (POST /qr-codes, dynamic). Verifikasi header X-Callback-Token = config xendit_callback_token. PAID/SETTLED → lunas; FAILED/EXPIRED → gateway_status saja (payment tetap pending).",
+ {id:"p-wh-xendit", method:"POST", path:"/penginapan/webhooks/xendit", auth:"none", desc:"Public — callback pembayaran Xendit QR Code (POST /qr_codes, dynamic; charge memakai Basic auth + api-version 2022-07-31). Verifikasi header X-Callback-Token = config xendit_callback_token. PAID/SETTLED → lunas; FAILED/EXPIRED → gateway_status saja (payment tetap pending).",
   body:{example:{external_id:"TPG-PAY-6-1760500100", status:"PAID", amount:60000, paid_at:"2026-10-15T12:05:00+07:00"}},
   responses:[
     {code:200, label:"OK", example:{success:true, message:"Webhook diproses", data:{status:"ok", payment_id:6, payment_status:"lunas"}}},

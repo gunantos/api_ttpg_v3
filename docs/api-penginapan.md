@@ -83,6 +83,8 @@ GET /penginapan/rooms?status=kosong&location_id=1&room_type=pria
 
 **`available` (field turunan — baca ini untuk ketersediaan):** `true` bila `status == "kosong"` dan `current_occupants < capacity`. Field ini ada di **semua** objek kamar (list, detail, CRUD, `room` di response tamu, dan event WebSocket).
 
+**Aturan UI pilih kamar (check-in):** tampilkan **semua** kamar — jangan disaring/d disembunyikan. Kamar dengan `room_type` ≠ gender tamu yang sedang diisi → tampil **disabled**: **bukan warna hijau**, tidak bisa diklik/dipilih. Hijau + bisa diklik hanya bila `room_type` **sama** dengan gender tamu **dan** `available:true` (kamar beda gender yang available juga tetap disabled). Query `?room_type=` hanya untuk keperluan lain — jangan dipakai untuk menyembunyikan kamar dari layar pemilihan.
+
 Buat kamar: `POST {location_id?, room_number, room_type:"pria"|"wanita", capacity?}` — `(location_id, room_number)` unik (kelangkaan → error). Layout: `POST {location_id?, room_id?, row_number, urutan}`.
 
 ## 3. Check-in
@@ -254,3 +256,4 @@ Setelah event `room` → refresh panel kamar; setelah `guest` → refresh daftar
 6. **Nominal** = integer rupiah (tanpa desimal). `amount` pembayaran saat check-in wajib ≥ 1.
 7. List tamu maks 500 baris (filter dulu per `room_id`/`status`/`checkin_date` bila perlu). List rooms/payments tanpa paginasi.
 8. **Foto KTP** disimpan di server (`$UPLOAD_DIR/ktp`, default `./uploads/ktp` relatif terhadap CWD server) dengan nama file dibuat server (`<guest_id>_<ts>_<rand>.<ext>`) — nama dari client diabaikan. Ganti foto = file lama dihapus. `GET .../ktp` butuh JWT (KTP = data sensitif); tampilkan via fetch-blob, bukan `<img src>` polos.
+9. **Hold pembayaran cash**: payment `pending` metode cash (tanpa gateway) otomatis **batal** + tamu yang belum lunas di-check-out otomatis setelah `payment_hold_minutes` (**default 15 menit**; config via `POST /penginapan/configs`, `0` = nonaktif). Sweep tiap 60 detik → kamar langsung `available` + event WS. Frontend boleh tampilkan countdown, tapi jangan mengandalkan status `pending` yang lama; refresh setelah event `guest`/`room`.

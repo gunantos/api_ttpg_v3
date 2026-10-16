@@ -3,6 +3,7 @@ package payment
 import (
 	"bytes"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,23 +34,27 @@ func (g *Xendit) Charge(req ChargeRequest) (*ChargeResult, error) {
 		return nil, fmt.Errorf("xendit: VA belum didukung, fokus QRIS")
 	}
 	payload := map[string]any{
-		"external_id":    req.ExternalID,
-		"amount":         req.Amount,
-		"type":           "DYNAMIC",
-		"payment_method": "QRIS",
-		"description":    req.Description,
+		"reference_id": req.ExternalID,
+		"type":         "DYNAMIC",
+		"currency":     "IDR",
+		"amount":       req.Amount,
+		"description":  req.Description,
+	}
+	if g.settings.CallbackURL != "" {
+		payload["callback_url"] = g.settings.CallbackURL
 	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
-	httpReq, err := http.NewRequest(http.MethodPost, strings.TrimRight(g.settings.BaseURL, "/")+"/qr-codes", bytes.NewReader(body))
+	httpReq, err := http.NewRequest(http.MethodPost, strings.TrimRight(g.settings.BaseURL, "/")+"/qr_codes", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("X-SECRET-KEY", g.settings.ServerKey)
+	httpReq.Header.Set("api-version", "2022-07-31")
+	httpReq.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(g.settings.ServerKey+":")))
 
 	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(httpReq)
 	if err != nil {

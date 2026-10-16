@@ -481,6 +481,7 @@ Aturan bisnis:
   ]
 }
 ```
+- **Aturan UI pilih kamar (check-in, aturan frontend)**: semua kamar selalu ditampilkan; kamar dengan `room_type` ≠ gender tamu → **disabled** (bukan warna hijau, tidak bisa diklik); hijau + bisa dipilih hanya `room_type` sama dengan gender tamu **dan** `available:true`.
 - `PUT /penginapan/rooms/:id/status` — `{"status": "kosong"|"terisi"|"maintenance"}`.
 - `DELETE /rooms` ditolak (409) bila ada tamu aktif.
 - `GET/POST/PUT/DELETE /penginapan/room-layouts[/:id]` — `location_id`, `room_id`, `row_number`, `urutan`; `GET` filter `location_id` (preload `location`, `room`).
@@ -599,11 +600,13 @@ Pembayaran online **QRIS** via **Midtrans** atau **Xendit** — provider dipilih
 3. `POST /penginapan/payments/:id/pay` → charge QRIS ke gateway → `{external_id, qr_string, expires_at}` — frontend render `qr_string` sebagai gambar QR (mis. lib qrCode) lalu tamu scan. Idempoten: QRIS pending yang belum kedaluwarsa dikembalikan ulang tanpa charge baru. `404 NOT_CONFIGURED` bila gateway belum diset; `409` bila payment `lunas`/`batal`; `502 GATEWAY_ERROR` bila API gateway gagal.
 4. Gateway memanggil webhook public:
    - **Midtrans** `POST /penginapan/webhooks/midtrans` — API Midtrans QRIS (`POST /qris`); verifikasi `signature_key` = SHA512(`order_id` + `gross_amount` + `status_code` + server key); `settlement`/`capture` → payment **lunas** (+ `paid_at`); `cancel`/`deny` → `gateway_status` saja; `expire` → `gateway_status`. `gross_amount` wajib sama dengan `amount` payment (selisih → `403`).
-   - **Xendit** `POST /penginapan/webhooks/xendit` — API Xendit QR Code (`POST /qr-codes`, dynamic); verifikasi header `X-Callback-Token`; status `PAID`/`SETTLED` → **lunas**; `FAILED`/`EXPIRED` → `gateway_status` saja (payment tetap `pending`).
+   - **Xendit** `POST /penginapan/webhooks/xendit` — API Xendit QR Code (`POST /qr_codes`, dynamic; auth Basic + header `api-version: 2022-07-31`); verifikasi header `X-Callback-Token`; status `PAID`/`SETTLED` → **lunas**; `FAILED`/`EXPIRED` → `gateway_status` saja (payment tetap `pending`).
    - Signature/token salah → `401`; `external_id` tak dikenal → `404`; webhook ganda saat sudah lunas → `200` idempoten.
 5. Setelah lunas (webhook) → buka `GET /penginapan/payments/:id/receipt?autoprint=1`.
 
 Kolom gateway di tabel `payments` (AutoMigrate; upgrade DB lama: `migrations/mysql/005_upgrade_payments_gateway.sql`): `gateway`, `external_id` (index), `qr_string`, `gateway_status`, `gateway_expires_at` (legacy `invoice_url`/`snap_token` tidak dipakai alur QRIS) — semua ikut ter-serialize di response `GET/POST /penginapan/payments`.
+
+**Hold pembayaran cash (timeout otomatis):** payment `pending` metode **cash** tanpa gateway yang lebih tua dari config `payment_hold_minutes` (menit; default **15**; `0` = nonaktif; set via `POST/PUT /penginapan/configs`) otomatis → `status='batal'` **dan** tamu terkait yang belum lunas di-check-out otomatis (history `check-out otomatis: pembayaran timeout`) sehingga kamar langsung `available` + event WS terkirim. Sweeper jalan tiap 60 detik. Payment yang sudah di-charge gateway tidak kena aturan ini (expiry ikut provider).
 
 ### Alur sekali jalan (front-desk)
 

@@ -51,14 +51,14 @@ MONGO_URI='mongodb://127.0.0.1:27017' ./ttpg_server &
 | `reset.sh` | Reset data uji (schema + seed Mongo + row GATE002 + po_ids kosong + re-migrasi `ttpg_penginapan` + migrasi/reset tabel vending `006`) |
 | `test_api.sh` | 187 assert: auth (JWT/Basic/API key seragam via `ttpg_users`), aturan endpoint (`api_url` wajib Bearer → 403, akses `access.id_api` → 403, blokir user → 403, logs tercatat), boarding Mongo list (paginasi + filter `destination_id`), docs interaktif `/docs`, gate (valid/rescan/max/expired/fallback + scan via JWT/Basic), boardingpass (CRUD: list/update/delete + get/print + secret_key), checkin mandiri, boarding Mongo CRUD, restriksi po_id, activity & logs (halaman /activity public, /activity/logs 401 tanpa token, redaksi password jadi [REDACTED], filter method/path/code/limit, isolasi log per user), vending (config merge server-side + auto-register, heartbeat 30 detik + extra, media urut order) |
 | `test_env_flags.sh` | 5 assert: `BYPASS=true`, `LIST_ID_CARD`, kembali normal (restart server) |
-| `test_penginapan.sh` | 160 assert: configs/lookups, master lokasi/kamar/layout (termasuk field turunan `available`), check-in (lunas/pending/alokasi/kapasitas/maintenance), summary lunas, foto KTP (upload valid/non-gambar/tanpa file, GET image + content-type, detail `ktp_photo`, GET 404 tanpa foto, delete → null), payment manual/void, checkout, pindah kamar, histories, guard delete, struk pembayaran (public + autoprint + 404), QRIS (404 belum dikonfigurasi → config → 200 payload), payment gateway midtrans/xendit QRIS (mock server lokal `python3` port 18080: charge → qr_string, idempoten, webhook valid/salah signature → lunas, amount mismatch → 403, unknown external_id → 404, EXPIRED → tetap pending, NOT_CONFIGURED) |
+| `test_penginapan.sh` | 174 assert: configs/lookups, master lokasi/kamar/layout (termasuk field turunan `available`), check-in (lunas/pending/alokasi/kapasitas/maintenance), summary lunas, foto KTP (upload valid/non-gambar/tanpa file, GET image + content-type, detail `ktp_photo`, GET 404 tanpa foto, delete → null), payment manual/void, checkout, pindah kamar, histories, guard delete, struk pembayaran (public + autoprint + 404), QRIS (404 belum dikonfigurasi → config → 200 payload), payment gateway midtrans/xendit QRIS (mock server lokal `python3` port 18080: charge → qr_string, idempoten, webhook valid/salah signature → lunas, amount mismatch → 403, unknown external_id → 404, EXPIRED → tetap pending, NOT_CONFIGURED), **hold pembayaran cash** (section K: config `payment_hold_minutes=1`, backdate `created_at` via SQL, poll ≤90s → payment batal + auto check-out + kamar available + history note) |
 | `test_ws.sh` | 14 assert: auth `/ws` (401 tanpa/salah token), koneksi client, event `room` (status change), event `occupancy` + `guest` (check-in) — build test client otomatis dari `wsclient/` |
 
 ```bash
 ./reset.sh
 ./test_api.sh         # ekspektasi: TOTAL: PASS=187 FAIL=0
 ./test_env_flags.sh   # ekspektasi: TOTAL: PASS=5 FAIL=0
-./reset.sh && ./test_penginapan.sh   # ekspektasi: TOTAL: PASS=160 FAIL=0
+./reset.sh && ./test_penginapan.sh   # ekspektasi: TOTAL: PASS=174 FAIL=0
 ./reset.sh && ./test_ws.sh           # ekspektasi: TOTAL: PASS=14 FAIL=0
 ```
 

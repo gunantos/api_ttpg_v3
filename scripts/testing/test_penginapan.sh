@@ -209,7 +209,8 @@ class H(BaseHTTPRequestHandler):
         n = int(self.headers.get('Content-Length', '0') or 0)
         body = self.rfile.read(n).decode('utf-8', 'ignore')
         try:
-            ext = json.loads(body).get('external_id', '')
+            d0 = json.loads(body)
+            ext = d0.get('reference_id') or d0.get('external_id') or ''
         except Exception:
             ext = ''
         if ext:
@@ -313,6 +314,34 @@ req "pay setelah gateway dilepas -> 404" POST "/penginapan/payments/$PG3/pay" 40
 ja "  NOT_CONFIGURED" '.errors[0].code == "NOT_CONFIGURED"'
 req "GET payment-gateway setelah dilepas -> 200" GET /penginapan/payment-gateway 200 -H "Authorization: Bearer $TOKEN"
 ja "  configured=false" '.data.configured == false'
+
+echo "===== K. HOLD PEMBAYARAN CASH (timeout) ====="
+req "POST room KTL-1 -> 201" POST /penginapan/rooms 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "{\"location_id\":$LOC_ID,\"room_number\":\"KTL-1\",\"room_type\":\"pria\",\"capacity\":1}"
+KROOM=$(jget .data.id)
+ja "  room baru available=true" '.data.available == true'
+req "check-in tamu hold (tanpa payment) -> 201" POST /penginapan/guests 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"guests":[{"room_id":'"$KROOM"',"name":"Hold Tester","gender":"pria","harga":50000}]}'
+KG=$(jget .data.guests[0].id)
+req "GET payment-methods (cash) -> 200" GET /penginapan/payment-methods 200 -H "Authorization: Bearer $TOKEN"
+CASH_ID=$(jget '[.data[] | select(.code=="cash") | .id][0]')
+req "payment cash pending -> 201" POST /penginapan/payments 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"amount":50000,"payment_method_id":'"$CASH_ID"',"source_id":1,"status":"pending","guest_ids":['"$KG"']}'
+KP=$(jget .data.id)
+ja "  pending + cash" '.data.status == "pending" and .data.payment_method_id == '"$CASH_ID"
+req "config payment_hold_minutes=1 -> 201" POST /penginapan/configs 201 -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"key_configs":"payment_hold_minutes","value_configs":"1"}'
+docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg_penginapan -e "UPDATE payments SET created_at = NOW() - INTERVAL 5 MINUTE WHERE id=$KP" 2>/dev/null
+KOK=0; BODY=""
+for _ in $(seq 1 18); do
+  sleep 5
+  BODY=$(curl -s -m 10 "$BASE/penginapan/payments/$KP" -H "Authorization: Bearer $TOKEN")
+  if printf '%s' "$BODY" | jq -e '.data.status=="batal"' >/dev/null 2>&1; then KOK=1; break; fi
+done
+if [ "$KOK" = "1" ]; then PASS=$((PASS+1)); echo "PASS  payment cash pending di-void otomatis (timeout ≤90s)"; else FAIL=$((FAIL+1)); echo "FAIL  payment tidak di-void dalam 90s body=${BODY:0:220}"; fi
+req "GET guest hold -> 200" GET "/penginapan/guests/$KG" 200 -H "Authorization: Bearer $TOKEN"
+ja "  checkout_date terisi (auto check-out)" '.data.checkout_date != null'
+req "GET room KTL-1 -> 200" GET "/penginapan/rooms/$KROOM" 200 -H "Authorization: Bearer $TOKEN"
+ja "  kamar available lagi" '.data.available == true and .data.current_occupants == 0'
+req "GET histories guest hold -> 200" GET "/penginapan/guests/$KG/histories" 200 -H "Authorization: Bearer $TOKEN"
+ja "  history check-out note timeout" '[.data[] | select(.status=="check-out" and ((.note // "") | contains("timeout")))] | length == 1'
+docker exec -i -e MYSQL_PWD=root ttpg-mysql mysql -uroot -h127.0.0.1 ttpg_penginapan -e "DELETE FROM configs WHERE key_configs='payment_hold_minutes'" 2>/dev/null
 
 echo ""
 echo "================================"

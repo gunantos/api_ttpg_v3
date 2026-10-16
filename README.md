@@ -9,7 +9,7 @@ API Go (Gin) untuk gate, boardingpass, checkin mandiri, master tujuan/PO, manaje
 - **Checkin mandiri**: dari MongoDB `boarding`, opsional fallback Damri, auto-generate noreg `CM…`
 - **Boardingpass**: list (filter+limit/offset), create/get, update/delete (soft), print (cetak HTML + QR)
 - **Master data**: `tbl_tujuan`, `tbl_po`, dokumen `boarding` di MongoDB dengan pembatasan `po_id` per user
-- **Penginapan** (`/penginapan/*`): master lokasi/kamar/layout, check-in multi-tamu, pembayaran (1 payment → banyak tamu, alokasi per tamu), pindah kamar, check-out, history, **struk pembayaran** (`GET /penginapan/payments/:id/receipt`, public, HTML 78mm + `?autoprint=1`), **QRIS** (`GET /penginapan/qris` dari config `qris_payload`), **payment gateway Midtrans & Xendit** (provider dipilih via config DB `payment_gateway`; `POST /penginapan/payments/:id/pay` + webhook public), **field turunan `available`** di semua response kamar (`true` bila kamar kosong — kemudahan client cek ketersediaan), **foto KTP per tamu** (`POST/GET/DELETE /penginapan/guests/:id/ktp`, multipart ≤5MB JPG/PNG/WebP, disimpan di `$UPLOAD_DIR/ktp`) — DB khusus `ttpg_penginapan` (GORM, AutoMigrate)
+- **Penginapan** (`/penginapan/*`): master lokasi/kamar/layout, check-in multi-tamu, pembayaran (1 payment → banyak tamu, alokasi per tamu), pindah kamar, check-out, history, **struk pembayaran** (`GET /penginapan/payments/:id/receipt`, public, HTML 78mm + `?autoprint=1`), **QRIS** (`GET /penginapan/qris` dari config `qris_payload`), **payment gateway Midtrans & Xendit** (provider dipilih via config DB `payment_gateway`; `POST /penginapan/payments/:id/pay` + webhook public), **field turunan `available`** di semua response kamar (`true` bila kamar kosong — kemudahan client cek ketersediaan), **foto KTP per tamu** (`POST/GET/DELETE /penginapan/guests/:id/ktp`, multipart ≤5MB JPG/PNG/WebP, disimpan di `$UPLOAD_DIR/ktp`), **hold pembayaran cash** (config DB `payment_hold_minutes`, default 15 menit → payment `pending` cash otomatis batal + tamu belum lunas di-check-out otomatis → kamar `available`) — DB khusus `ttpg_penginapan` (GORM, AutoMigrate)
 - **WebSocket** (`GET /ws?token=<JWT>`): push real-time perubahan kamar (create/update/status/occupancy/delete) dan tamu (checkin/checkout/pindah) ke semua client terautentikasi
 - **Dokumentasi interaktif** (`GET /docs`, public): halaman HTML dengan parameter, body, contoh respons, dan snippet **cURL / PHP / Python / Node.js / Go** per endpoint — plus fitur "Coba" (request langsung dari browser)
 - **Aktivitas & Log** (`GET /activity`, public): halaman riwayat request per user — status, data terkirim (query + body, rahasia disamarkan), IP, durasi; filter method/path/status/tanggal + paginasi; API `GET /activity/logs` (user biasa hanya melihat lognya sendiri, admin semua). Log lama dihapus otomatis (`LOG_RETENTION_DAYS`, default 30 hari)
@@ -136,7 +136,7 @@ internal/
   client/                # TicketClient, DamriClient
   docs/                  # api.html + docs.go (embed halaman /docs)
   routes/routes.go       # registrasi semua route
-scripts/testing/         # smoke test lokal (366 assert) + reset DB uji + wsclient/
+scripts/testing/         # smoke test lokal (380 assert) + reset DB uji + wsclient/
 migrations/mysql/        # 001_create_ttpg_auth.sql, 002_create_ttpg_penginapan.sql (baru), 003_upgrade_penginapan_v2.sql, 004_create_ttpg_users.sql (skema auth + seed lokal), 005_upgrade_payments_gateway.sql (upgrade kolom gateway payments), 006_create_ttpg_vending.sql (tabel vending: machines/configs/media + seed config global), 007_upgrade_guests_ktp.sql (kolom ktp_photo guests)
 docs/api.md              # dokumentasi API lengkap
 ```
@@ -181,7 +181,7 @@ go build ./...
 go vet ./...
 ```
 
-Smoke test end-to-end (Docker MySQL+Mongo lokal, 366 assert) ada di [`scripts/testing/`](scripts/testing/README.md):
+Smoke test end-to-end (Docker MySQL+Mongo lokal, 380 assert) ada di [`scripts/testing/`](scripts/testing/README.md):
 
 ```bash
 cd scripts/testing && ./reset.sh && ./test_api.sh && ./test_env_flags.sh && ./test_penginapan.sh && ./reset.sh && ./test_ws.sh

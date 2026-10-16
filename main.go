@@ -6,6 +6,7 @@ import (
 
 	"github.com/andtho89/ttpg/internal/config"
 	"github.com/andtho89/ttpg/internal/db"
+	"github.com/andtho89/ttpg/internal/handler"
 	"github.com/andtho89/ttpg/internal/models"
 	"github.com/andtho89/ttpg/internal/platform/auth"
 	"github.com/andtho89/ttpg/internal/platform/database"
@@ -74,6 +75,8 @@ func main() {
 
 	r := gin.Default()
 	routes.RegisterRoutes(r, mainDB, mongoClient)
+
+	go handler.StartPaymentTimeoutSweeper()
 
 	log.Printf("Server running on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
