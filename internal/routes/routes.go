@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/andtho89/ttpg/internal/activity"
+	"github.com/andtho89/ttpg/internal/admin"
 	"github.com/andtho89/ttpg/internal/docs"
 	"github.com/andtho89/ttpg/internal/handler"
 	"github.com/andtho89/ttpg/internal/login"
@@ -30,6 +31,7 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 	r.GET("/docs", docs.Serve)
 	r.GET("/activity", activity.Serve)
 	r.GET("/login", login.Serve)
+	r.GET("/admin", admin.Serve)
 	r.GET("/penginapan/payments/:id/receipt", handler.PaymentReceipt)
 	r.POST("/penginapan/webhooks/midtrans", handler.WebhookMidtrans)
 	r.POST("/penginapan/webhooks/xendit", handler.WebhookXendit)
