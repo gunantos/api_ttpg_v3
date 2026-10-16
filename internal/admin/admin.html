@@ -291,7 +291,7 @@ input:focus,select:focus{border-color:var(--acc)}
       </div>
       <div class="scroll">
       <table>
-        <thead><tr><th>#</th><th>PO</th><th>Ticket</th><th>Nopol</th><th>Tujuan</th><th>Tgl/Jam</th><th>Status</th><th>Penumpang</th></tr></thead>
+        <thead><tr><th>#</th><th>PO</th><th>Ticket</th><th>Nopol</th><th>Tujuan</th><th>Tgl/Jam</th><th>Status</th><th>Penumpang</th><th>Aksi</th></tr></thead>
         <tbody id="brows"></tbody>
       </table>
       </div>
@@ -301,6 +301,16 @@ input:focus,select:focus{border-color:var(--acc)}
   </section>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<div id="boardingModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-auto p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-bold text-slate-800">Detail Boarding</h2>
+      <button class="btn" id="btnCloseBoardingModal">Tutup</button>
+    </div>
+    <div id="boardingModalBody"></div>
+  </div>
+</div>
+
 <script>
 const $=id=>document.getElementById(id);
 let token=''; let limit=20,offset=0, total=0;
@@ -309,7 +319,7 @@ function loadToken(){ try{return localStorage.getItem('ttpg_login_token')||'';}c
 function saveToken(t){ try{localStorage.setItem('ttpg_login_token',t);}catch(e){} }
 function setBanner(msg,err){ const b=$('banner'); if(!b) return; b.textContent=msg; b.className='banner show '+(err?'err':'ok'); if(!err) setTimeout(()=>b.classList.remove('show'),4000); }
 function showTokenBox(){ $('loginScreen').classList.remove('hidden'); $('loginScreen').classList.add('flex'); $('app').style.display='none'; document.body.classList.remove('appshow'); }
-function showApp(){ $('loginScreen').classList.add('hidden'); $('loginScreen').classList.remove('flex'); $('app').style.display='block'; document.body.classList.add('appshow'); if($('sidebar')) $('sidebar').style.display=''; showView('dashboard'); refreshAll(); }
+function showApp(){ $('loginScreen').classList.add('hidden'); $('loginScreen').classList.remove('flex'); $('app').style.display='block'; document.body.classList.add('appshow'); if($('sidebar')) $('sidebar').style.display=''; showView('dashboard'); connectWS(); refreshAll(); }
 function setErr(m){ $('loginErr').textContent=m||''; }
 async function api(path, opts){ opts=opts||{}; const h=Object.assign({'Authorization':'Bearer '+token}, opts.headers||{}); const r=await fetch(path,{...opts,headers:h}); if(!r.ok){ const t=await r.text(); throw new Error(r.status+' '+t.slice(0,180)); } const ct=r.headers.get('content-type')||''; if(ct.includes('application/json')) return r.json(); return r.text(); }
 
@@ -397,6 +407,31 @@ function showView(name){
 }
 
 
+
+
+function showBoardingDetail(key){
+  const r=(window.boardingRows||{})[key];
+  if(!r){ setBanner('Detail boarding tidak ditemukan',true); return; }
+  const dest=(r.destination_id&&(r.destination_id.id_tujuan||r.destination_id))||r.destination_id||'—';
+  const pnp=(r.pnp||[]).map(x=>`<li>${esc(x.name||'-')} · ${esc(x.gender||'-')} · ${esc(x.id_card||'')}</li>`).join('')||'<li>—</li>';
+  const body=$('boardingModalBody');
+  if(body) body.innerHTML=`
+    <div class="kv"><b>_id</b><span class="mono">${esc(r._id||'—')}</span></div>
+    <div class="kv"><b>boarding_id</b><span>${esc(r.boarding_id||'—')}</span></div>
+    <div class="kv"><b>po_id</b><span>${esc(r.po_id||'—')}</span></div>
+    <div class="kv"><b>ticket_id</b><span class="mono">${esc(r.ticket_id||'—')}</span></div>
+    <div class="kv"><b>nopol</b><span>${esc(r.nopol||'—')}</span></div>
+    <div class="kv"><b>tujuan</b><span>${esc(dest)}</span></div>
+    <div class="kv"><b>keberangkatan</b><span>${esc(r.date_of_departure)} ${esc(r.time_of_departure)}</span></div>
+    <div class="kv"><b>status</b><span>${esc(r.status||'—')}</span></div>
+    <div class="kv"><b>fungsi</b><span>${esc(r.fungsi||'—')}</span></div>
+    <div class="kv"><b>penumpang</b><ul style="margin:0;padding-left:18px">${pnp}</ul></div>
+    <div class="kv"><b>raw</b><pre class="pre">${esc(JSON.stringify(r,null,2))}</pre></div>`;
+  const m=$('boardingModal'); if(m){ m.classList.remove('hidden'); m.classList.add('flex'); }
+}
+function closeBoardingModal(){ const m=$('boardingModal'); if(m){ m.classList.add('hidden'); m.classList.remove('flex'); } }
+
+
 async function fetchLogs(){
   const qs=new URLSearchParams();
   qs.set('limit',limit); qs.set('offset',offset);
@@ -454,8 +489,11 @@ async function fetchBoarding(){
   let data; 
   try{ data=await api('/boarding?'+qs.toString()); }catch(e){ setBanner('Gagal ambil boarding: '+e.message,true); return; }
   btotal=data.pagination?data.pagination.total:(data.data||[]).length;
+  window.boardingRows = {};
   const tb=$('brows'); tb.innerHTML='';
   (data.data||[]).forEach((r,i)=>{
+    const key = r._id || r.boarding_id || (boffset+i);
+    window.boardingRows[key]=r;
     const pnp=(r.pnp||[]).map(x=>`${esc(x.name)} (${esc(x.gender||'-')})`).join(', ') || '—';
     const tr=document.createElement('tr');
     tr.innerHTML=`<td class="dim">${boffset+i+1}</td>
@@ -465,9 +503,11 @@ async function fetchBoarding(){
       <td>${esc((r.destination_id&& (r.destination_id.id_tujuan||r.destination_id))||r.destination_id||'—')}</td>
       <td class="mono">${esc(r.date_of_departure)} ${esc(r.time_of_departure)}</td>
       <td><span class="badge ${r.status==='active'?'s2':'s4'}">${r.status}</span></td>
-      <td style="max-width:360px">${pnp}</td>`;
+      <td style="max-width:360px">${pnp}</td>
+      <td><button class="btn sm" data-bdetail="${esc(key)}">Detail</button></td>`;
     tb.appendChild(tr);
   });
+  tb.querySelectorAll('[data-bdetail]').forEach(b=>b.addEventListener('click',()=>showBoardingDetail(b.getAttribute('data-bdetail'))));
   $('bpageinfo').textContent = `total ${btotal} · hal ${Math.floor(boffset/blimit)+1} / ${Math.max(1,Math.ceil(btotal/blimit))}`;
 }
 
@@ -491,7 +531,22 @@ $('bSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){boffset=0;fetchB
 ['bStatus','bDest'].forEach(id=>$(id).onchange=()=>{boffset=0;fetchBoarding();});
 $('fPath').addEventListener('keydown',e=>{if(e.key==='Enter'){offset=0;fetchLogs();}});
 ['fMethod','fCode','fAuth','fFrom','fTo'].forEach(id=>$(id).onchange=()=>{offset=0;fetchLogs();});
-$('auto').onchange=()=>{ if($('auto').checked){ setInterval(fetchLogs,10000);} };
+let _autoTimer=null;
+function setAutoRefresh(enabled){
+  if(_autoTimer){ clearInterval(_autoTimer); _autoTimer=null; }
+  if(enabled){ _autoTimer=setInterval(()=>{ refreshAll(); },10000); }
+}
+function scheduleRefresh(){ if(window._refreshTimer) return; window._refreshTimer=setTimeout(()=>{ window._refreshTimer=null; refreshAll(); },700); }
+function connectWS(){
+  if(!token) return;
+  if(window._ws){ try{window._ws.close();}catch(e){} }
+  const proto = location.protocol==='https:'?'wss://':'ws://';
+  try { window._ws = new WebSocket(proto+location.host+'/ws?token='+encodeURIComponent(token)); } catch(e){ return; }
+  window._ws.onmessage = ()=>scheduleRefresh();
+  window._ws.onclose = ()=>{ if(token) setTimeout(connectWS,3000); };
+}
+$('auto').onchange=()=>setAutoRefresh($('auto').checked);
+
 
 $('prev').onclick=()=>{ offset=Math.max(0,offset-limit); fetchLogs(); };
 $('next').onclick=()=>{ offset+=limit; fetchLogs(); };
@@ -504,6 +559,8 @@ try{ localStorage.removeItem('ttpg_login_token'); }catch(e){}
 document.querySelectorAll('[data-view]').forEach(l=>{ l.addEventListener('click',e=>{e.preventDefault(); showView(l.dataset.view);}); });
 const _sbBtn=$('btnSidebarToggle'); if(_sbBtn) _sbBtn.addEventListener('click',()=>{ const sb=$('sidebar'); sb.classList.toggle('collapsed'); _sbBtn.textContent=sb.classList.contains('collapsed')?'▶':'◀'; });
 const _mob=$('btnMobileSidebar'); if(_mob) _mob.addEventListener('click',()=>{ const sb=$('sidebar'); sb.classList.toggle('open'); });
+const _bcm=$('btnCloseBoardingModal'); if(_bcm) _bcm.addEventListener('click',closeBoardingModal);
+const _bmodal=$('boardingModal'); if(_bmodal) _bmodal.addEventListener('click',e=>{ if(e.target && e.target.id==='boardingModal') closeBoardingModal(); });
 showTokenBox();
 </script>
   </div>
