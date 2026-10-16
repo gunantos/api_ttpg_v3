@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TTPG — Admin Console</title>
 <style>
-:root{--bg:#070b14;--bg2:#0c1220;--card:#101827;--card2:#0a1221;--line:#1f2937;--txt:#e5eefc;--mut:#94a3b8;--acc:#6366f1;--acc2:#8b5cf6;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;--blue:#38bdf8}
+:root{--bg:#f4f6fa;--sidebar:#0b2a5a;--sidebar-2:#0a224a;--card:#ffffff;--card2:#f8fafc;--line:#dde3ec;--txt:#1f2937;--mut:#5b6b83;--acc:#0b2a5a;--acc2:#1e40af;--ok:#16a34a;--warn:#d97706;--err:#dc2626;--blue:#2563eb}
 *{box-sizing:border-box}
-body{margin:0;background:radial-gradient(1200px 600px at 10% -10%,#1e1b4b,#070b14),radial-gradient(900px 500px at 100% 0%,#0f172a,#070b14);color:var(--txt);font:14.5px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
+body{margin:0;background:#f4f6fa;color:var(--txt);font:14.5px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh}
 a{color:var(--blue);text-decoration:none}
 .top{display:flex;align-items:center;gap:16px;padding:16px 24px;border-bottom:1px solid var(--line);background:rgba(10,18,33,.7);backdrop-filter:blur(12px);position:sticky;top:0;z-index:10}
 .top .logo{display:flex;align-items:center;gap:10px;font-weight:700}
@@ -72,17 +72,50 @@ input:focus,select:focus{border-color:var(--acc)}
 .loader{display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .scroll{max-height:440px;overflow:auto}
+
+  .layout{display:grid;grid-template-columns:250px 1fr;min-height:calc(100vh - 0px)}
+  @media(max-width:900px){.layout{grid-template-columns:1fr}.sidebar{position:sticky;top:0}}
+  .sidebar{background:var(--sidebar);color:#e8eefc;padding:22px 18px;display:flex;flex-direction:column;gap:18px;border-right:1px solid var(--line)}
+  .brand{font-weight:700;font-size:18px;display:flex;align-items:center;gap:10px}
+  .brand-sub{color:#9fb2d9;font-size:12px;margin-top:-12px}
+  .smenu{display:flex;flex-direction:column;gap:4px}
+  .smenu a{color:#c7d2fe;text-decoration:none;padding:9px 12px;border-radius:8px;display:flex;gap:8px;align-items:center;border:1px solid transparent;font-size:14px}
+  .smenu a:hover{background:var(--sidebar-2);color:#fff;border-color:#243b6b}
+  .smenu a.on{background:#fff;color:var(--acc);font-weight:600}
+  .side-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+  .side-foot span{color:#9fb2d9;font-size:12px}
+  .main{padding:24px 28px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .topbar h1{font-size:22px;margin:0}
+  .badge-ghost{background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:999px;padding:4px 10px;font-size:11px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;box-shadow:0 6px 18px rgba(15,23,42,.06)}
+  .hero .big{color:var(--acc)}
+  .glow{color:var(--acc2)}
+  .btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+  .btn.primary:hover{background:var(--acc2)}
+  .stat .box b{color:var(--acc)}
+  .table thead th{background:#f1f4fa}
+  table thead th{background:#f1f4fa}
+  .pre{background:#f8fafc;color:#1f2937;border-color:var(--line)}
+  .overlay{background:rgba(255,255,255,.9)}
+  tr:hover{background:#f1f4fa}
 </style>
 </head>
 <body>
-<div class="top">
-  <div class="logo"><span class="dot"></span> TTPG · Console</div>
-  <span class="sub">Aktivitas &amp; log request per user — boarding • penginapan • gate</span>
-  <nav>
-    <a href="/docs">API Docs</a>
-    <a href="/activity">Log Klasik</a>
-  </nav>
-</div>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>TTPG Console</div>
+    <div class="brand-sub">Aktivitas &amp; log request</div>
+    <nav class="smenu">
+      <a href="#dashboard" class="on"><span>Dashboard</span></a>
+      <a href="#logs"><span>Log Request</span></a>
+      <a href="#boarding"><span>Boarding Data</span></a>
+      <a href="/docs"><span>API Docs</span></a>
+      <a href="/activity"><span>Log Klasik</span></a>
+    </nav>
+    <div class="side-foot"><span id="whoamiSide">—</span><button class="btn ghost sm" id="btnLogoutSide">Keluar</button></div>
+  </aside>
+  <div class="main">
 
 <div id="tokenbox" class="wrap">
   <div class="card">
@@ -332,5 +365,7 @@ $('bnext').onclick=()=>{ boffset+=blimit; fetchBoarding(); };
 try{ localStorage.removeItem('ttpg_login_token'); }catch(e){}
 showTokenBox();
 </script>
+  </div>
+</div>
 </body>
 </html>
