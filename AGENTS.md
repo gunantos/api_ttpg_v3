@@ -18,7 +18,7 @@ Smoke test end-to-end (Docker MySQL+Mongo lokal, 352 assert) ada di `scripts/tes
 - Seed auth: `migrations/mysql/004_create_ttpg_users.sql` (lokal saja; produksi sudah punya `ttpg_users`). `go run cmd/seed/main.go` = legacy `ttpg_auth`, tidak dipakai auth.
 - **Server WAJIB dapat keempat-nya**: `AUTH_DSN`, `MAIN_DSN`, `PENGINAPAN_DSN`, **`USERS_DSN`** (auth — default menunjuk DB produksi `ttpg_users`; jika DB/user ditolak → `log.Fatalf`). Untuk test lokal Docker: semua DSN → `127.0.0.1:13306` (lihat `scripts/testing/test_env_flags.sh` `restart()` / `run_server.sh`).
 - **Auth membaca `ttpg_users`** (env `USERS_DSN`): login/JWT/API key/Basic dari tabel `user`; aturan endpoint dari `api_url` + `access`/`allowed`; request dicatat async ke `logs` (`params` = JSON query+body **ter-redaksi** — `password`/`secret`/`token`/`api_key` → `[REDACTED]`; body dibaca maks 16KB); log > `LOG_RETENTION_DAYS` (env, default 30; `0` = nonaktif) dihapus otomatis tiap jam + saat start (`internal/platform/auth/logging.go`). Tabel `ttpg_auth.users`/`api_keys` **tidak dipakai auth lagi** (masih di-seed legacy).
-- **Sandbox TIDAK bisa mencapai `192.168.1.3:3306` (MySQL) dan `27017` (Mongo)** — test runtime harus dijalankan di mesin user atau Docker lokal. Jangan mengubah default DSN/URI hanya karena koneksi gagal di sandbox.
+- **MySQL produksi `192.168.1.3:3306` bisa diakses dari lingkungan ini** (diverifikasi 2026-10-15; mysql client via `docker exec -i ttpg-mysql mysql -h192.168.1.3 -uapi2`, env `MYSQL_PWD=andtho1989`) — dipakai **hanya untuk migrasi/operasi manual** (mis. `005`, `006`). **Test runtime TETAP jangan diarahkan ke produksi** — pakai Docker lokal `127.0.0.1:13306`. Cek dulu konektivitas (bisa berubah tergantung VPN/jaringan); Mongo produksi `27017` tidak diverifikasi.
 - **`MONGO_URI` default WAJIB menyertakan `directConnection=true`**: Mongo produksi adalah replica-set `rs0` yang mengiklankan host `localhost.localdomain:27017`; tanpa directConnection driver Go menemukan primary di localhost yang salah → `ReplicaSetNoPrimary, Servers: []` (mongosh tetap jalan — jangan pakai mongosh sebagai patokan driver).
 
 ## Struktur
@@ -41,7 +41,7 @@ internal/
                              # penginapan_config, penginapan_master, penginapan_guest, penginapan_payment, penginapan_receipt, penginapan_gateway, activity, vending, ws
   payment/                     # Gateway interface + registry pluggable; midtrans.go (POST /qris + SHA512 verify), xendit.go (POST /qr-codes + X-Callback-Token)
                              # (ws.go: hub WebSocket + broadcast event kamar/tamu)
-  docs/                      # api.html (docs interaktif /docs, di-embed via docs.go)
+  docs/                      # api.html (docs interaktif /docs, di-embed via docs.go) + api-penginapan.md (spec ringkas frontend penginapan, dikirim ke agent frontend)
   activity/                  # activity.html + activity.go (halaman UI /activity: riwayat log request user)
   client/                    # TicketClient (newticket.dgti.co.id), DamriClient
   routes/routes.go           # semua registrasi route

@@ -190,5 +190,6 @@ cd scripts/testing && ./reset.sh && ./test_api.sh && ./test_env_flags.sh && ./te
 
 ## Dokumentasi
 
-- **API**: [`docs/api.md`](docs/api.md)
+- **API**: [`docs/api.md`](docs/api.md) — daftar endpoint lengkap seluruh modul
+- **API Penginapan (khusus frontend)**: [`docs/api-penginapan.md`](docs/api-penginapan.md) — ringkas, contoh request/response, aturan & jebakan; dikirim ke agent/pengembang frontend penginapan
 - **Instruksi agent/kontributor**: [`AGENTS.md`](AGENTS.md) — wajib dibaca; setiap perubahan kode harus memperbarui README ini, `AGENTS.md`, dan `docs/api.md`.
