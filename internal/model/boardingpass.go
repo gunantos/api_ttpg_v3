@@ -27,4 +27,6 @@ type Boardingpass struct {
 	Created          time.Time      `json:"created"`
 	Updated          sql.NullTime   `json:"updated"`
 	Deleted          sql.NullTime   `json:"deleted"`
+	KTPPhoto         sql.NullString `json:"ktp_photo"`
+	TicketPhoto      sql.NullString `json:"ticket_photo"`
 }

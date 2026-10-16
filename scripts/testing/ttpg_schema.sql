@@ -46,6 +46,8 @@ CREATE TABLE terminal_boardingpass (
   retribusi INT NOT NULL DEFAULT 0,
   count_scan INT NULL,
   pembelian_dari VARCHAR(100) NULL,
+  ktp_photo VARCHAR(250) NULL,
+  ticket_photo VARCHAR(250) NULL,
   created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated DATETIME NULL,
   deleted DATETIME NULL,

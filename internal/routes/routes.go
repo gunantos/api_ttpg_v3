@@ -48,6 +48,12 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 	apiKeyAuth.POST("/boardingpass", handler.Create)
 	apiKeyAuth.PUT("/boardingpass/:id", handler.Update)
 	apiKeyAuth.DELETE("/boardingpass/:id", handler.Delete)
+	apiKeyAuth.POST("/boardingpass/:id/ktp", handler.UploadBoardingpassImage)
+	apiKeyAuth.GET("/boardingpass/:id/ktp", handler.GetBoardingpassImage)
+	apiKeyAuth.DELETE("/boardingpass/:id/ktp", handler.DeleteBoardingpassImage)
+	apiKeyAuth.POST("/boardingpass/:id/tiket", handler.UploadBoardingpassImage)
+	apiKeyAuth.GET("/boardingpass/:id/tiket", handler.GetBoardingpassImage)
+	apiKeyAuth.DELETE("/boardingpass/:id/tiket", handler.DeleteBoardingpassImage)
 	r.POST("/auth", func(c *gin.Context) {
 		var req struct {
 			Username string `json:"username" binding:"required"`

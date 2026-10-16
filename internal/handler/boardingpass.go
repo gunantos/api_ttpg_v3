@@ -1,12 +1,19 @@
 package handler
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/andtho89/ttpg/internal/config"
 
 	"github.com/andtho89/ttpg/internal/client"
 	"github.com/andtho89/ttpg/internal/db"
@@ -118,7 +125,8 @@ func selectBoardingpass(id int) (model.Boardingpass, error) {
         SELECT id, noreg, ticket_id, id_po, id_tujuan, nopol,
                tanggal_berangkat, jam_berangkat, nama_pnp, sex_pnp,
                fungsi, gate_id, device_id, time_tab, id_user,
-               retribusi, count_scan, pembelian_dari, created, updated, deleted
+               retribusi, count_scan, pembelian_dari, created, updated, deleted,
+               ktp_photo, ticket_photo
         FROM terminal_boardingpass
         WHERE id = ? AND deleted IS NULL
     `
@@ -130,6 +138,7 @@ func selectBoardingpass(id int) (model.Boardingpass, error) {
 		&b.NamaPnp, &b.SexPnp, &b.Fungsi, &b.GateID,
 		&b.DeviceID, &b.TimeTab, &b.IDUser, &b.Retribusi,
 		&b.CountScan, &b.PembelianDari, &b.Created, &b.Updated, &b.Deleted,
+		&b.KTPPhoto, &b.TicketPhoto,
 	)
 	return b, err
 }
@@ -341,4 +350,195 @@ func Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "boardingpass berhasil dihapus"})
+}
+
+const bpImgMaxBytes = 5 << 20
+
+func bpImageDir(kind string) string {
+	return filepath.Join(config.C.UploadDir, "boardingpass", kind)
+}
+
+func bpImageName(id int, kind, ext string) string {
+	b := make([]byte, 4)
+	rand.Read(b)
+	return fmt.Sprintf("bp%d_%s_%d_%s.%s", id, kind, time.Now().Unix(), hex.EncodeToString(b), ext)
+}
+
+func bpKindColumn(kind string) (string, bool) {
+	switch kind {
+	case "ktp":
+		return "ktp_photo", true
+	case "tiket":
+		return "ticket_photo", true
+	}
+	return "", false
+}
+
+func bpLoad(c *gin.Context, id int) bool {
+	var n int
+	if err := db.DB.QueryRow("SELECT COUNT(*) FROM terminal_boardingpass WHERE id=? AND deleted IS NULL", id).Scan(&n); err != nil || n == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "boardingpass tidak ditemukan"})
+		return false
+	}
+	return true
+}
+
+func bpKindFromPath(c *gin.Context) string {
+	p := strings.TrimRight(c.Request.URL.Path, "/")
+	if strings.HasSuffix(p, "/ktp") {
+		return "ktp"
+	}
+	if strings.HasSuffix(p, "/tiket") {
+		return "tiket"
+	}
+	if v := c.Param("kind"); v != "" {
+		return v
+	}
+	return ""
+}
+
+func UploadBoardingpassImage(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id tidak valid"})
+		return
+	}
+	kind := bpKindFromPath(c)
+	col, ok := bpKindColumn(kind)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "jenis gambar tidak valid (ktp|tiket)"})
+		return
+	}
+	if !bpLoad(c, id) {
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, bpImgMaxBytes+1024)
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file wajib dikirim (multipart form-field 'file')"})
+		return
+	}
+	if file.Size > bpImgMaxBytes {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ukuran gambar maksimal 5MB"})
+		return
+	}
+	f, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membaca file: " + err.Error()})
+		return
+	}
+	defer f.Close()
+	head := make([]byte, 512)
+	n, _ := f.Read(head)
+	var ext string
+	switch http.DetectContentType(head[:n]) {
+	case "image/jpeg":
+		ext = "jpg"
+	case "image/png":
+		ext = "png"
+	case "image/webp":
+		ext = "webp"
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "format gambar harus JPG, PNG, atau WebP"})
+		return
+	}
+	dir := bpImageDir(kind)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membuat folder upload: " + err.Error()})
+		return
+	}
+	filename := bpImageName(id, kind, ext)
+	if err := c.SaveUploadedFile(file, filepath.Join(dir, filename)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan file: " + err.Error()})
+		return
+	}
+	// hapus file lama bila ada
+	var old sql.NullString
+	var colname string
+	switch kind {
+	case "ktp":
+		colname = "ktp_photo"
+	case "tiket":
+		colname = "ticket_photo"
+	}
+	_ = colname
+	qr := "SELECT " + col + " FROM terminal_boardingpass WHERE id=? AND deleted IS NULL"
+	if err := db.DB.QueryRow(qr, id).Scan(&old); err == nil && old.Valid && old.String != "" {
+		os.Remove(filepath.Join(dir, filepath.Base(old.String)))
+	}
+	if _, err := db.DB.Exec("UPDATE terminal_boardingpass SET "+col+"=?, updated=NOW() WHERE id=? AND deleted IS NULL", filename, id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan data gambar: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"id": id, "kind": kind, col: filename, "message": "gambar berhasil disimpan"})
+}
+
+func GetBoardingpassImage(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id tidak valid"})
+		return
+	}
+	kind := bpKindFromPath(c)
+	col, ok := bpKindColumn(kind)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "jenis gambar tidak valid (ktp|tiket)"})
+		return
+	}
+	if !bpLoad(c, id) {
+		return
+	}
+	var name sql.NullString
+	qr := "SELECT " + col + " FROM terminal_boardingpass WHERE id=? AND deleted IS NULL"
+	if err := db.DB.QueryRow(qr, id).Scan(&name); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membaca data boardingpass"})
+		return
+	}
+	if !name.Valid || name.String == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "gambar belum ada"})
+		return
+	}
+	fname := filepath.Base(name.String)
+	if fname != name.String {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "nama file gambar tidak valid"})
+		return
+	}
+	path := filepath.Join(bpImageDir(kind), fname)
+	if _, err := os.Stat(path); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "file gambar tidak ditemukan"})
+		return
+	}
+	c.Header("Cache-Control", "private, max-age=86400")
+	c.File(path)
+}
+
+func DeleteBoardingpassImage(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id tidak valid"})
+		return
+	}
+	kind := bpKindFromPath(c)
+	col, ok := bpKindColumn(kind)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "jenis gambar tidak valid (ktp|tiket)"})
+		return
+	}
+	if !bpLoad(c, id) {
+		return
+	}
+	var name sql.NullString
+	qr := "SELECT " + col + " FROM terminal_boardingpass WHERE id=? AND deleted IS NULL"
+	if err := db.DB.QueryRow(qr, id).Scan(&name); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membaca data boardingpass"})
+		return
+	}
+	if name.Valid && name.String != "" {
+		os.Remove(filepath.Join(bpImageDir(kind), filepath.Base(name.String)))
+	}
+	if _, err := db.DB.Exec("UPDATE terminal_boardingpass SET "+col+"=NULL, updated=NOW() WHERE id=? AND deleted IS NULL", id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menghapus data gambar"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"id": id, "kind": kind, col: nil, "message": "gambar berhasil dihapus"})
 }
