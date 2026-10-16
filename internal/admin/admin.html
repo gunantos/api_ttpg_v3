@@ -103,7 +103,7 @@ input:focus,select:focus{border-color:var(--acc)}
 </head>
 <body>
 <div class="layout">
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar" style="display:none">
     <div class="brand"><span class="dot"></span>TTPG Console</div>
     <div class="brand-sub">Aktivitas &amp; log request</div>
     <nav class="smenu">
@@ -227,7 +227,7 @@ function loadToken(){ try{return localStorage.getItem('ttpg_login_token')||'';}c
 function saveToken(t){ try{localStorage.setItem('ttpg_login_token',t);}catch(e){} }
 function setBanner(msg,err){ const b=$('banner'); b.textContent=msg; b.className='banner show '+(err?'err':'ok'); if(!err) setTimeout(()=>b.classList.remove('show'),4000); }
 function showTokenBox(){ $('tokenbox').style.display=''; $('app').style.display='none'; document.body.classList.remove('appshow'); }
-function showApp(){ $('tokenbox').style.display='none'; $('app').style.display='block'; document.body.classList.add('appshow'); $('p_token').textContent='token aktif'; refreshAll(); }
+function showApp(){ $('tokenbox').style.display='none'; $('app').style.display='block'; document.body.classList.add('appshow'); if($('sidebar')) $('sidebar').style.display=''; refreshAll(); }
 function setErr(m){ $('loginErr').textContent=m||''; }
 async function api(path, opts){ opts=opts||{}; const h=Object.assign({'Authorization':'Bearer '+token}, opts.headers||{}); const r=await fetch(path,{...opts,headers:h}); if(!r.ok){ const t=await r.text(); throw new Error(r.status+' '+t.slice(0,180)); } const ct=r.headers.get('content-type')||''; if(ct.includes('application/json')) return r.json(); return r.text(); }
 
