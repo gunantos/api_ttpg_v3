@@ -97,14 +97,7 @@ input:focus,select:focus{border-color:var(--acc)}
       <div class="field"><label>Password</label><input type="password" id="pInput" placeholder="••••••••" autocomplete="current-password"></div>
     </div>
     <div class="row">
-      <button class="btn primary" id="btnLogin">Masuk (username/password)</button>
-      <span class="dim">atau</span>
-      <button class="btn ghost" id="btnToken">Pakai token (paste)</button>
-      <button class="btn ghost" id="btnDemo">Token dari URL</button>
-    </div>
-    <div class="field" style="margin-top:10px">
-      <label>JWT Token (opsional)</label>
-      <input type="password" id="tokenInput" placeholder="eyJhbGciOiJIUzI1NiIs…">
+      <button class="btn primary" id="btnLogin">Masuk</button>
     </div>
     <span id="loginErr" class="err" style="font-size:12px"></span>
     <p class="dim" style="margin-top:10px;font-size:12px">Login validasi ke tabel <span class="mono">ttpg_users.user</span> via POST /auth. Admin wajib role "admin".</p>
@@ -319,12 +312,6 @@ $('btnLogin').onclick=async ()=>{
     await finishLogin(j.data && (j.data.token||j.data.Token));
   }catch(e){ setErr('Login gagal: '+e.message); }
 };
-$('btnToken').onclick=async ()=>{
-  const t=$('tokenInput').value.trim();
-  if(!t){ setErr('Token kosong'); return; }
-  await finishLogin(t);
-};
-$('btnDemo').onclick=()=>{ const u=new URLSearchParams(location.search); const t=u.get('token'); if(t){$('tokenInput').value=t; finishLogin(t);} else { setBanner('Tambah ?token=<JWT> di URL',true);} };
 
 $('btnLogout').onclick=()=>{ token=''; saveToken(''); try{localStorage.removeItem('ttpg_login_token')}catch(e){} showTokenBox(); };
 $('btnReload').onclick=()=>refreshAll();
@@ -341,10 +328,9 @@ $('next').onclick=()=>{ offset+=limit; fetchLogs(); };
 $('bprev').onclick=()=>{ boffset=Math.max(0,boffset-blimit); fetchBoarding(); };
 $('bnext').onclick=()=>{ boffset+=blimit; fetchBoarding(); };
 
-const u=new URLSearchParams(location.search);
-token = u.get('token')||loadToken();
-if(token) showApp(); else showTokenBox();
-if(token) $('tokenInput').value=token;
+// wajib login username/password — token lama di localStorage diabaikan
+try{ localStorage.removeItem('ttpg_login_token'); }catch(e){}
+showTokenBox();
 </script>
 </body>
 </html>
