@@ -50,7 +50,7 @@ func (g *Midtrans) Charge(req ChargeRequest) (*ChargeResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	httpReq, err := http.NewRequest(http.MethodPost, strings.TrimRight(g.settings.BaseURL, "/")+"/qris", bytes.NewReader(body))
+	httpReq, err := http.NewRequest(http.MethodPost, strings.TrimRight(g.settings.BaseURL, "/")+"/v2/charge", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (g *Midtrans) VerifyWebhook(r *http.Request, body []byte) (*WebhookResult, 
 		return nil, ErrInvalidSignature
 	}
 	gross := rawJSONString(n.GrossAmount)
-	sum := sha512.Sum512([]byte(n.OrderID + gross + n.StatusCode + g.settings.ServerKey))
+	sum := sha512.Sum512([]byte(n.OrderID + n.StatusCode + gross + g.settings.ServerKey))
 	expected := hex.EncodeToString(sum[:])
 	if subtle.ConstantTimeCompare([]byte(strings.ToLower(n.SignatureKey)), []byte(expected)) != 1 {
 		return nil, ErrInvalidSignature
