@@ -88,7 +88,7 @@ func HashKey(key string) string {
 }
 
 func RoleFromUser(u *models.TtpgUser) string {
-	if u.Level == nil {
+	if u.Level == nil || u.AllAccess == "y" {
 		return "admin"
 	}
 	return "user"

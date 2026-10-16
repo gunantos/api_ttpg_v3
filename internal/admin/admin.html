@@ -92,16 +92,22 @@ input:focus,select:focus{border-color:var(--acc)}
         <p class="sub">Tempel JWT dari <span class="mono">POST /auth</span>. Token disimpan di browser ini saja (tidak dikirim ke server selain header Authorization).</p>
       </div>
     </div>
-    <div class="field" style="margin-top:14px">
-      <label>JWT Token</label>
-      <input type="password" id="tokenInput" placeholder="eyJhbGciOiJIUzI1NiIs…">
+    <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px;margin-top:14px">
+      <div class="field"><label>Username</label><input type="text" id="uInput" placeholder="mis. admin" autocomplete="username"></div>
+      <div class="field"><label>Password</label><input type="password" id="pInput" placeholder="••••••••" autocomplete="current-password"></div>
     </div>
     <div class="row">
-      <button class="btn primary" id="btnToken">Masuk</button>
-      <button class="btn ghost" id="btnDemo">Pakai token dari URL</button>
-      <span id="loginErr" class="err" style="font-size:12px"></span>
+      <button class="btn primary" id="btnLogin">Masuk (username/password)</button>
+      <span class="dim">atau</span>
+      <button class="btn ghost" id="btnToken">Pakai token (paste)</button>
+      <button class="btn ghost" id="btnDemo">Token dari URL</button>
     </div>
-    <p class="dim" style="margin-top:12px;font-size:12px">Tip: URL <span class="mono">/admin?token=&lt;JWT&gt;</span> atau <span class="mono">/admin?demo=1</span> (pakai X-ttpg-key superkey dari localStorage).</p>
+    <div class="field" style="margin-top:10px">
+      <label>JWT Token (opsional)</label>
+      <input type="password" id="tokenInput" placeholder="eyJhbGciOiJIUzI1NiIs…">
+    </div>
+    <span id="loginErr" class="err" style="font-size:12px"></span>
+    <p class="dim" style="margin-top:10px;font-size:12px">Login validasi ke tabel <span class="mono">ttpg_users.user</span> via POST /auth. Admin wajib role "admin".</p>
     <div class="stat">
       <div class="box"><b id="s_users">—</b><span>Pengguna</span></div>
       <div class="box"><b id="s_logs">—</b><span>Log hari ini</span></div>
@@ -302,13 +308,24 @@ async function fetchBoarding(){
   $('bpageinfo').textContent = `total ${btotal} · hal ${Math.floor(boffset/blimit)+1} / ${Math.max(1,Math.ceil(btotal/blimit))}`;
 }
 
+async function finishLogin(t){ if(!t){ setErr('Token kosong dari server'); return; } try{ await fetch('/activity/logs?limit=1',{headers:{Authorization:'Bearer '+t}}).then(r=>{if(!r.ok)throw new Error(r.status)}); }catch(e){ setErr('Token tidak valid: '+e.message); return false;} token=t; saveToken(token); setErr(''); showApp(); return true; }
+$('btnLogin').onclick=async ()=>{
+  setErr(''); const u=$('uInput').value.trim(); const p=$('pInput').value;
+  if(!u||!p){ setErr('Username/password wajib'); return; }
+  try{
+    const r=await fetch('/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok || !j.success){ throw new Error(j.message || r.status); }
+    await finishLogin(j.data && (j.data.token||j.data.Token));
+  }catch(e){ setErr('Login gagal: '+e.message); }
+};
 $('btnToken').onclick=async ()=>{
   const t=$('tokenInput').value.trim();
-  if(!t){ setBanner('Token kosong',true); return; }
-  try{ await fetch('/activity/logs?limit=1',{headers:{Authorization:'Bearer '+t}}).then(r=>{if(!r.ok)throw new Error(r.status)}); }catch(e){ setBanner('Token tidak valid: '+e.message,true); setErr('Token tidak valid: '+e.message); return; }
-  token=t; saveToken(token); setErr(''); showApp();
+  if(!t){ setErr('Token kosong'); return; }
+  await finishLogin(t);
 };
-$('btnDemo').onclick=()=>{ const u=new URLSearchParams(location.search); const t=u.get('token'); if(t){$('tokenInput').value=t; $('btnToken').click();} else { setBanner('Tambah ?token=<JWT> di URL',true);} };
+$('btnDemo').onclick=()=>{ const u=new URLSearchParams(location.search); const t=u.get('token'); if(t){$('tokenInput').value=t; finishLogin(t);} else { setBanner('Tambah ?token=<JWT> di URL',true);} };
+
 $('btnLogout').onclick=()=>{ token=''; saveToken(''); try{localStorage.removeItem('ttpg_login_token')}catch(e){} showTokenBox(); };
 $('btnReload').onclick=()=>refreshAll();
 $('btnF').onclick=()=>{ offset=0; fetchLogs(); };
