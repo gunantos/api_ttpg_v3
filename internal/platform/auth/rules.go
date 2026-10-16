@@ -33,7 +33,7 @@ func normalizeEndpoint(s string) string {
 // terhadap path request maupun pola route Gin (cth "/penginapan/rooms/:id").
 func findApiURL(method, path, ginPattern string) (*models.TtpgApiURL, error) {
 	var rows []models.TtpgApiURL
-	if err := UsersDB.Order("id asc").Find(&rows).Error; err != nil {
+	if err := UsersDB.Order("id desc").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	m := strings.ToLower(strings.TrimSpace(method))

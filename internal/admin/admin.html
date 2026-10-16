@@ -162,6 +162,7 @@ input:focus,select:focus{border-color:var(--acc)}
 </div>
 
 <div id="app" class="flex-1 min-w-0 p-4 md:p-6 lg:p-8" style="display:none">
+<span id="banner" class="hidden"></span>
   <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
     <button class="btn" id="btnMobileSidebar" title="Menu">☰</button>
     <div>
@@ -306,7 +307,7 @@ let token=''; let limit=20,offset=0, total=0;
 let blimit=10,boffset=0,btotal=0;
 function loadToken(){ try{return localStorage.getItem('ttpg_login_token')||'';}catch(e){return '';} }
 function saveToken(t){ try{localStorage.setItem('ttpg_login_token',t);}catch(e){} }
-function setBanner(msg,err){ const b=$('banner'); b.textContent=msg; b.className='banner show '+(err?'err':'ok'); if(!err) setTimeout(()=>b.classList.remove('show'),4000); }
+function setBanner(msg,err){ const b=$('banner'); if(!b) return; b.textContent=msg; b.className='banner show '+(err?'err':'ok'); if(!err) setTimeout(()=>b.classList.remove('show'),4000); }
 function showTokenBox(){ $('loginScreen').classList.remove('hidden'); $('loginScreen').classList.add('flex'); $('app').style.display='none'; document.body.classList.remove('appshow'); }
 function showApp(){ $('loginScreen').classList.add('hidden'); $('loginScreen').classList.remove('flex'); $('app').style.display='block'; document.body.classList.add('appshow'); if($('sidebar')) $('sidebar').style.display=''; showView('dashboard'); refreshAll(); }
 function setErr(m){ $('loginErr').textContent=m||''; }
@@ -482,8 +483,8 @@ $('btnLogin').onclick=async ()=>{
   }catch(e){ setErr('Login gagal: '+e.message); }
 };
 
-$('btnLogout').onclick=()=>{ token=''; saveToken(''); try{localStorage.removeItem('ttpg_login_token')}catch(e){} showTokenBox(); };
-$('btnReload').onclick=()=>refreshAll();
+const _btnLogout=$('btnLogout'); if(_btnLogout) _btnLogout.onclick=()=>{ token=''; saveToken(''); try{localStorage.removeItem('ttpg_login_token')}catch(e){} showTokenBox(); };
+const _btnReload=$('btnReload'); if(_btnReload) _btnReload.onclick=()=>refreshAll();
 $('btnF').onclick=()=>{ offset=0; fetchLogs(); };
 $('btnB').onclick=()=>{ boffset=0; fetchBoarding(); };
 $('bSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){boffset=0;fetchBoarding();}});
