@@ -272,7 +272,7 @@ const GROUPS = [
   responses:[
     {code:200, label:"OK", example:{id:1, noreg:"…", ticket_id:"…", id_po:"…", id_tujuan:1, nopol:"…", tanggal_berangkat:"2026-10-12", jam_berangkat:"08:00:00", nama_pnp:"…", sex_pnp:{String:"L", Valid:true}, fungsi:{String:"checkin", Valid:true}, gate_id:{Int64:0, Valid:false}, count_scan:{Int64:0, Valid:true}, created:"…"}},
     {code:404, label:"Tidak ada", example:{error:"boardingpass tidak ditemukan"}}]},
- {id:"bp-create", method:"POST", path:"/boardingpass", auth:"apikey", desc:"Buat boardingpass. Field kosong (nama_pnp, tanggal_berangkat, jam_berangkat, nopol) diambil dari API tiket eksternal. Wajib: noreg.",
+ {id:"bp-create", method:"POST", path:"/boardingpass", auth:"apikey", desc:"Buat boardingpass. Field kosong (nama_pnp, tanggal_berangkat, jam_berangkat, nopol) diambil dari API tiket eksternal. Wajib: noreg. Mendukung multipart/form-data dengan file opsional ktp/ktp_file dan tiket/ticket/file untuk upload foto langsung.",
   body:{example:{noreg:"ABC123", ticket_id:"TKT-001", id_po:"PO001", id_tujuan:1, nopol:"B 1234 XY", tanggal_berangkat:"2026-10-12", jam_berangkat:"08:00:00", nama_pnp:"Budi", sex_pnp:"L", fungsi:"checking", retribusi:0, pembelian_dari:"loket"}},
   responses:[
     {code:201, label:"Created", example:{id:123, message:"boardingpass berhasil dibuat", api_data:{noreg:"ABC123", nama_pnp:"Budi", tujuan:"Bekasi", nopol:"B 1234 XY"}}},

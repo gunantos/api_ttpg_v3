@@ -308,6 +308,16 @@ Respons:
 - `409` `{"error": "boardingpass dengan noreg ini sudah ada"}`
 - `400`/`500` `{"error": "…"}`
 
+#### Upload langsung saat create (opsional)
+
+`POST /boardingpass` juga menerima `multipart/form-data` dengan field data yang sama (form field, bukan JSON) plus file opsional:
+
+- `ktp` / `ktp_file` / `ktp_photo` → foto KTP
+- `tiket` / `ticket` / `file` / `ticket_file` / `ticket_photo` → foto tiket
+
+Jika file dikirim, upload dilakukan setelah baris boardingpass dibuat; respons `201` menambahkan `ktp_photo`/`ticket_photo` (nama file) bila sukses. Bila upload gagal, respons `4xx/5xx` menyertakan `id` boardingpass yang sudah dibuat agar file bisa diulang via endpoint terpisah.
+
+
 ### PUT `/boardingpass/:id`
 
 Auth seragam†. Body — semua field opsional, hanya yang dikirim yang di-update:

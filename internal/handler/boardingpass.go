@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"log"
-	"net/http"
+	"io"
+"log"
+	"mime/multipart"
+"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -21,11 +23,27 @@ import (
 	"github.com/andtho89/ttpg/internal/request"
 	"github.com/andtho89/ttpg/internal/response"
 	"github.com/gin-gonic/gin"
+"github.com/gin-gonic/gin/binding"
 )
+
+func firstBoardingpassFormFile(c *gin.Context, names []string) *multipart.FileHeader {
+	for _, n := range names {
+		if fh, err := c.FormFile(n); err == nil && fh != nil {
+			return fh
+		}
+	}
+	return nil
+}
 
 func Create(c *gin.Context) {
 	var req request.CreateBoardingpassRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	var err error
+	if strings.HasPrefix(c.ContentType(), "multipart/form-data") {
+		err = c.ShouldBindWith(&req, binding.FormMultipart)
+	} else {
+		err = c.ShouldBindJSON(&req)
+	}
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "body tidak valid: " + err.Error()})
 		return
 	}
@@ -92,11 +110,36 @@ func Create(c *gin.Context) {
 	}
 
 	id, _ := result.LastInsertId()
-	c.JSON(http.StatusCreated, gin.H{
+	resp := gin.H{
 		"id":       id,
 		"message":  "boardingpass berhasil dibuat",
 		"api_data": ticketData,
-	})
+	}
+	// upload opsional langsung dari POST /boardingpass (multipart): field ktp/ktp_file dan tiket/ticket/file
+	for _, spec := range []struct {
+		kind   string
+		col    string
+		fields []string
+	}{
+		{"ktp", "ktp_photo", []string{"ktp", "ktp_file", "ktp_photo", "file_ktp"}},
+		{"tiket", "ticket_photo", []string{"tiket", "ticket", "ticket_file", "ticket_photo", "file", "file_tiket"}},
+	} {
+		fh := firstBoardingpassFormFile(c, spec.fields)
+		if fh == nil {
+			continue
+		}
+		filename, err := saveBoardingpassImage(int(id), spec.kind, fh)
+		if err != nil {
+			status := http.StatusBadRequest
+			if strings.HasPrefix(err.Error(), "gagal ") {
+				status = http.StatusInternalServerError
+			}
+			c.JSON(status, gin.H{"id": id, "error": err.Error(), "message": "boardingpass dibuat, tapi upload " + spec.kind + " gagal"})
+			return
+		}
+		resp[spec.col] = filename
+	}
+	c.JSON(http.StatusCreated, resp)
 }
 
 func GetByID(c *gin.Context) {
@@ -397,35 +440,17 @@ func bpKindFromPath(c *gin.Context) string {
 	return ""
 }
 
-func UploadBoardingpassImage(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id tidak valid"})
-		return
-	}
-	kind := bpKindFromPath(c)
+func saveBoardingpassImage(id int, kind string, fh *multipart.FileHeader) (string, error) {
 	col, ok := bpKindColumn(kind)
 	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "jenis gambar tidak valid (ktp|tiket)"})
-		return
+		return "", fmt.Errorf("jenis gambar tidak valid (ktp|tiket)")
 	}
-	if !bpLoad(c, id) {
-		return
+	if fh.Size > bpImgMaxBytes {
+		return "", fmt.Errorf("ukuran gambar maksimal 5MB")
 	}
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, bpImgMaxBytes+1024)
-	file, err := c.FormFile("file")
+	f, err := fh.Open()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "file wajib dikirim (multipart form-field 'file')"})
-		return
-	}
-	if file.Size > bpImgMaxBytes {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ukuran gambar maksimal 5MB"})
-		return
-	}
-	f, err := file.Open()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membaca file: " + err.Error()})
-		return
+		return "", fmt.Errorf("gagal membaca file: %w", err)
 	}
 	defer f.Close()
 	head := make([]byte, 512)
@@ -439,36 +464,76 @@ func UploadBoardingpassImage(c *gin.Context) {
 	case "image/webp":
 		ext = "webp"
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "format gambar harus JPG, PNG, atau WebP"})
-		return
+		return "", fmt.Errorf("format gambar harus JPG, PNG, atau WebP")
 	}
 	dir := bpImageDir(kind)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membuat folder upload: " + err.Error()})
-		return
+		return "", fmt.Errorf("gagal membuat folder upload: %w", err)
 	}
 	filename := bpImageName(id, kind, ext)
-	if err := c.SaveUploadedFile(file, filepath.Join(dir, filename)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan file: " + err.Error()})
-		return
+	if err := saveUploadedFile(fh, filepath.Join(dir, filename)); err != nil {
+		return "", fmt.Errorf("gagal menyimpan file: %w", err)
 	}
 	// hapus file lama bila ada
 	var old sql.NullString
-	var colname string
-	switch kind {
-	case "ktp":
-		colname = "ktp_photo"
-	case "tiket":
-		colname = "ticket_photo"
-	}
-	_ = colname
 	qr := "SELECT " + col + " FROM terminal_boardingpass WHERE id=? AND deleted IS NULL"
 	if err := db.DB.QueryRow(qr, id).Scan(&old); err == nil && old.Valid && old.String != "" {
 		os.Remove(filepath.Join(dir, filepath.Base(old.String)))
 	}
 	if _, err := db.DB.Exec("UPDATE terminal_boardingpass SET "+col+"=?, updated=NOW() WHERE id=? AND deleted IS NULL", filename, id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan data gambar: " + err.Error()})
+		return "", fmt.Errorf("gagal menyimpan data gambar: %w", err)
+	}
+	return filename, nil
+}
+
+func saveUploadedFile(fh *multipart.FileHeader, dst string) error {
+	src, err := fh.Open()
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	if _, err := io.Copy(out, src); err != nil {
+		return err
+	}
+	return nil
+}
+
+func UploadBoardingpassImage(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id tidak valid"})
 		return
+	}
+	kind := bpKindFromPath(c)
+	if _, ok := bpKindColumn(kind); !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "jenis gambar tidak valid (ktp|tiket)"})
+		return
+	}
+	if !bpLoad(c, id) {
+		return
+	}
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file wajib dikirim (multipart form-field 'file')"})
+		return
+	}
+	filename, err := saveBoardingpassImage(id, kind, file)
+	if err != nil {
+		status := http.StatusBadRequest
+		if strings.HasPrefix(err.Error(), "gagal ") {
+			status = http.StatusInternalServerError
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
+	}
+	col := "ktp_photo"
+	if kind == "tiket" {
+		col = "ticket_photo"
 	}
 	c.JSON(http.StatusOK, gin.H{"id": id, "kind": kind, col: filename, "message": "gambar berhasil disimpan"})
 }

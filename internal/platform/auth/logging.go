@@ -71,8 +71,13 @@ func captureBody(c *gin.Context) {
 		return
 	}
 	b, _ := io.ReadAll(io.LimitReader(c.Request.Body, maxLogBody))
-	c.Set("req_body", redactBody(b))
 	c.Request.Body = io.NopCloser(bytes.NewReader(b))
+	ct := strings.ToLower(c.GetHeader("Content-Type"))
+	if strings.Contains(ct, "multipart/form-data") || strings.Contains(ct, "application/octet-stream") {
+		c.Set("req_body", "")
+		return
+	}
+	c.Set("req_body", redactBody(b))
 }
 
 func logParams(c *gin.Context) string {
