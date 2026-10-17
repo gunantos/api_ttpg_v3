@@ -404,7 +404,7 @@ Auth seragam (JWT / Basic / API key — lihat [Autentikasi](#autentikasi)). Hany
 
 ### GET `/bus`
 
-Auth seragam (JWT / Basic / API key — lihat [Autentikasi](#autentikasi)). Data `tbl_bus` (MySQL `ttpg`) untuk autocomplete bus di frontend. Query opsional:
+Auth seragam (JWT / Basic / API key — lihat [Autentikasi](#autentikasi)). Data `tbl_bus` (MySQL `ttpg`) untuk autocomplete bus di frontend, dengan **JOIN** `terminal_trayek_main` (trayek) dan `tbl_tujuan` (asal & tujuan) agar rute/trayek dan kota asal-tujuan ikut terkirim. Query opsional:
 
 - `q` / `search` — LIKE pada `kode`, `nopol`, `trayek1`, `trayek2`, `nm_perusahaan`, `id_po`
 - `id_po` — filter exact PO
