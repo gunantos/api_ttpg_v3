@@ -275,7 +275,7 @@ const GROUPS = [
  {id:"bp-create", method:"POST", path:"/boardingpass", auth:"apikey", desc:"Buat boardingpass. Field kosong (nama_pnp, tanggal_berangkat, jam_berangkat, nopol) diambil dari API tiket eksternal. Wajib: noreg. Mendukung multipart/form-data dengan file opsional ktp/ktp_file dan tiket/ticket/file untuk upload foto langsung.",
   body:{example:{noreg:"ABC123", ticket_id:"TKT-001", id_po:"PO001", id_tujuan:1, nopol:"B 1234 XY", tanggal_berangkat:"2026-10-12", jam_berangkat:"08:00:00", nama_pnp:"Budi", sex_pnp:"L", fungsi:"checking", retribusi:0, pembelian_dari:"loket"}},
   responses:[
-    {code:201, label:"Created", example:{id:123, message:"boardingpass berhasil dibuat", api_data:{noreg:"ABC123", nama_pnp:"Budi", tujuan:"Bekasi", nopol:"B 1234 XY"}}},
+    {code:201, label:"Created", example:{id:123, message:"boardingpass berhasil dibuat", api_data:{noreg:"ABC123", nama_pnp:"Budi", tujuan:"Bekasi", nopol:"B 1234 XY"}, ktp_photo:null, ticket_photo:null}},
     {code:404, label:"Tiket tak ada", example:{error:"noreg tidak ditemukan di sistem tiket"}},
     {code:409, label:"Duplikat", example:{error:"boardingpass dengan noreg ini sudah ada"}}]},
  {id:"bp-update", method:"PUT", path:"/boardingpass/:id", auth:"apikey", desc:"Update parsial — hanya field yang dikirim. gate_id/time_tab string kosong → NULL; count_scan ≥ 0.",
