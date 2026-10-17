@@ -155,7 +155,7 @@
 <main>
   <div class="hero">
     <h2>Dokumentasi API TTPG</h2>
-    <p>Terminal Tiket &amp; Gate + modul Penginapan. 4 MySQL (<code>ttpg_users</code>, <code>ttpg_auth</code>, <code>ttpg</code>, <code>ttpg_penginapan</code>) + MongoDB (<code>ttpg</code>).
+    <p>Terminal Tiket &amp; Gate + modul Penginapan. Seluruh endpoint, parameter, body, dan contoh respons ada di bawah.
        Semua endpoint, parameter, body, dan contoh respons ada di bawah — lengkap dengan snippet cURL, PHP, Python, Node.js, dan Go.</p>
     <div class="toolbar">
       <div class="f">
@@ -245,17 +245,17 @@ const GROUPS = [
 <tr><td><code>VALID RESCAN</code></td><td>sudah gatein/gateout, scan ≤ 5 &lt; 5 menit</td></tr>
 <tr><td><code>MAXIMUM SCAN TERCAPAI</code></td><td>count_scan ≥ 5 → tolak</td></tr>
 <tr><td><code>SCAN SUDAH EXPIRED</code></td><td>scan terakhir &gt; 5 menit → tolak</td></tr></table>`},
- {id:"checkin", method:"POST", path:"/checkin-mandiri", auth:"apikey", desc:"Check-in mandiri dari ticket_id. Cari di Mongo boarding (status=active); opsional fallback Damri. Insert terminal_boardingpass (fungsi=checkin) + dokumen Mongo boardingpass, transaksional.",
+ {id:"checkin", method:"POST", path:"/checkin-mandiri", auth:"apikey", desc:"Check-in mandiri dari ticket_id. Opsional fallback Damri. Transaksional.",
   body:{example:{ticket_id:"TKT-001"}, fields:[
     {name:"ticket_id", type:"string", req:true, desc:"id tiket (JSON atau form)"}]},
   responses:[
-    {code:201, label:"Berhasil", example:{status:true, id:123, noreg:"CMa1b2…", ticket_id:"TKT-001", source:"mongodb", pembelian_dari:"loket", print_url:"http://…/boarding/print/CM…?…", message:"checkin mandiri berhasil"}},
+    {code:201, label:"Berhasil", example:{status:true, id:123, noreg:"CMa1b2…", ticket_id:"TKT-001", pembelian_dari:"loket", print_url:"http://…/boarding/print/CM…?…", message:"checkin mandiri berhasil"}},
     {code:200, label:"Sudah checkin", example:{status:true, message:"boardingpass sudah checkin hari ini", data:{id:1, noreg:"…", ticket_id:"…", fungsi:"checkin", print_url:"…"}}},
     {code:409, label:"Konflik", example:{status:false, message:"boardingpass dengan ticket_id ini sudah ada hari ini", data:{id:1, noreg:"…", ticket_id:"…", print_url:"…"}}},
     {code:404, label:"Tidak ada", example:{status:false, message:"ticket_id tidak ditemukan"}},
     {code:504, label:"Damri timeout", example:{status:false, message:"request damri timeout"}}]}
 ]},
-{id:"bp", title:"Boardingpass (MySQL)", items:[
+{id:"bp", title:"Boardingpass", items:[
  {id:"bp-list", method:"GET", path:"/boardingpass", auth:"apikey", desc:"List boardingpass (hanya deleted IS NULL), urut id DESC. Format mentah {data, total}.",
   params:[
     {name:"noreg", in:"query", type:"string", req:false, desc:"LIKE"},
@@ -339,13 +339,13 @@ const GROUPS = [
     {code:404, label:"Tidak ada", example:{status:false, message:"boardingpass tidak ditemukan"}}]}
 ]},
 {id:"master", title:"Master Data", items:[
- {id:"tujuan", method:"GET", path:"/tujuan", auth:"jwt", desc:"Daftar tujuan (tbl_tujuan, semua kolom), urut id_tujuan.",
+ {id:"tujuan", method:"GET", path:"/tujuan", auth:"jwt", desc:"Daftar tujuan, urut id_tujuan.",
   responses:[{code:200, label:"OK", example:{success:true, message:"Data tujuan ditemukan", data:[{id_tujuan:1, tujuan:"Jakarta", kawasan:"Jawa", kode_tujuan:""}]}}]},
  {id:"po", method:"GET", path:"/po", auth:"jwt", desc:"Daftar PO — hanya id_po & nama_po, urut id_po.",
   responses:[{code:200, label:"OK", example:{success:true, message:"Data po ditemukan", data:[{id_po:"PO001", nama_po:"PO Contoh"}]}}]}
 ]},
-{id:"bus", title:"Bus (MySQL)", items:[
- {id:"bus-list", method:"GET", path:"/bus", auth:"jwt", desc:"Autocomplete tbl_bus (join tbl_po nama_po + terminal_trayek_main + tbl_tujuan asal/tujuan). Query: q/search (LIKE kode/nopol/trayek/nm_perusahaan/id_po/nama_po/rute/asal/tujuan), id_po, status, limit (1-100, default 20).",
+{id:"bus", title:"Bus", items:[
+ {id:"bus-list", method:"GET", path:"/bus", auth:"jwt", desc:"Autocomplete data bus (join PO/trayek/asal-tujuan). Query: q/search, id_po, status, limit (1-100, default 20).",
   params:[
     {name:"q", in:"query", type:"string", req:false, desc:"kata kunci"},
     {name:"id_po", in:"query", type:"string", req:false, desc:"filter PO"},
@@ -354,8 +354,8 @@ const GROUPS = [
   responses:[
     {code:200, label:"OK", example:{success:true, message:"Data bus ditemukan", data:[{id_bus:4, kode:"101010", nopol:"B7013BGA", id_po:"PO009", nama_po:"PO Contoh", nm_perusahaan:"PT. ARIMBI JAYA AGUNG", trayek1:"…", trayek2:"…", jenis_bus:"ac", pnp:44, status:"1", trayek_main_id:3, trayek_kode:"0000000000", asal_id:18, asal:"Jakarta Timur", tujuan_id:643, tujuan:"Magelang", rute:"MERAK-…-JAKARTA(PULO)"}]}},
     {code:400, label:"Invalid", example:{error:"limit harus 1-100"}}]}]},
-{id:"boarding", title:"Boarding (MongoDB)", items:[
- {id:"b-list", method:"GET", path:"/boarding", auth:"jwt", desc:"List dokumen koleksi ttpg.boarding (wajib paginasi). destination_id menerima int / string \"395\" / object {id_tujuan}; filter memakai $or ketiganya.",
+{id:"boarding", title:"Boarding", items:[
+ {id:"b-list", method:"GET", path:"/boarding", auth:"jwt", desc:"List data boarding (wajib paginasi). destination_id menerima int / string \"395\" / object {id_tujuan}; filter memakai $or ketiganya.",
   params:[
     {name:"po_id", in:"query", type:"string", req:false, desc:"disaring juga ke po_id user"},
     {name:"ticket_id", in:"query", type:"string", req:false, desc:"exact"},
@@ -377,14 +377,14 @@ const GROUPS = [
     {code:403, label:"po_id tolak", example:{success:false, message:"po_id tidak diizinkan untuk user ini"}},
     {code:400, label:"Invalid", example:{success:false, message:"Data tidak valid", errors:[{code:"VALIDATION_ERROR", detail:"…"}]}}]},
  {id:"b-update", method:"PUT", path:"/boarding/:id", auth:"jwt", desc:"Update parsial dokumen boarding. :id = ObjectId hex.",
-  params:[{name:"id", in:"path", type:"string", req:true, desc:"Mongo ObjectId hex (24 char)"}],
+  params:[{name:"id", in:"path", type:"string", req:true, desc:"id dokumen (24 char)"}],
   body:{example:{nopol:"B 8888 XY", status:"inactive", date_of_departure:"2026-10-16", time_of_departure:"09:00:00", destination_id:2}},
   responses:[
     {code:200, label:"OK", example:{success:true, message:"Boarding berhasil diupdate", data:null}},
     {code:404, label:"Tidak ada", example:{success:false, message:"Boarding tidak ditemukan"}},
     {code:400, label:"Invalid id", example:{success:false, message:"id tidak valid"}}]},
  {id:"b-delete", method:"DELETE", path:"/boarding/:id", auth:"jwt", desc:"Hapus dokumen boarding (hard delete).",
-  params:[{name:"id", in:"path", type:"string", req:true, desc:"Mongo ObjectId hex"}],
+  params:[{name:"id", in:"path", type:"string", req:true, desc:"id dokumen"}],
   responses:[
     {code:200, label:"OK", example:{success:true, message:"Boarding berhasil dihapus", data:null}},
     {code:404, label:"Tidak ada", example:{success:false, message:"Boarding tidak ditemukan"}}]}
@@ -581,13 +581,13 @@ const GROUPS = [
     {name:"status", in:"query", type:"string", req:false, desc:"check-in | check-out | pindah"}]}
 ]},
 {id:"vending", title:"Vending (Mesin OTOMAT)", items:[
- {id:"v-config", method:"GET", path:"/vending/config", auth:"apikey", desc:"Bundle config mesin. Server-merge global (__global__) + override per mesin: objek direkursif, array/scalar diganti; version/updated_at dari baris menang. Auto-register machine_id belum ada → status=pending. Sync client tiap 5 menit (manual window.VENDING_CONFIG.sync()), simpan version, unduh media, broadcast config_updated. Client wajib validasi: root objek, idle objek, attract objek, attract.sources array — gagal → fallback cache. Setiap sync memperbarui last_seen_at + config_version mesin.",
+ {id:"v-config", method:"GET", path:"/vending/config", auth:"apikey", desc:"Bundle config mesin. Server-merge global (__global__) + override per mesin: objek direkursif, array/scalar diganti; version/updated_at dari baris menang. Auto-register machine_id belum ada → status=pending. Sync client tiap 5 menit, simpan version, unduh media, broadcast config_updated. Client wajib validasi: root objek, idle objek, attract objek, attract.sources array — gagal → fallback cache. Setiap sync memperbarui last_seen_at + config_version mesin.",
   params:[{name:"machine_id", in:"query", type:"string", req:true, desc:"id mesin (dari PENDING_ID); kosong → 400"}],
   responses:[
     {code:200, label:"OK", example:{success:true, message:"Konfigurasi mesin", data:{version:"cfg-20261015-1", updated_at:"2026-10-15T10:00:00Z", cameras:{ktp:null, person:null}, ocr:{crop:null, language:"eng+ind", confidence_min:0.7}, idle:{minutes:3, enabled:true}, attract:{mode:"hybrid", sources:[]}, speech:{enabled:true, model:"whisper-small", language:"id"}, media_cache_limit_mb:500}}},
     {code:400, label:"machine_id kosong", example:{success:false, message:"machine_id wajib diisi"}},
     {code:401, label:"tanpa key/token", example:{success:false, message:"unauthorized"}},
-    {code:500, label:"config global hilang", example:{success:false, message:"config global tidak ditemukan — jalankan migration 006"}}]},
+    {code:500, label:"config global hilang", example:{success:false, message:"config global tidak ditemukan"}}]},
  {id:"v-heartbeat", method:"POST", path:"/vending/device/status", auth:"apikey", desc:"Heartbeat mesin tiap 30 detik. Auto-register; upsert app_version, config_version, last_sync_at (RFC3339 dari client), last_seen_at (server time) + extra. Status pending/active TIDAK diubah oleh heartbeat (approve via admin). extra = objek JSON bebas (mis. idle, person_present, errors), maks 8KB.",
   body:{example:{machine_id:"PENDING_1", app_version:"2.2.1-a", config_version:"cfg-20261015-1", last_sync_at:"2026-10-15T10:00:00.000Z", extra:{idle:7, person_present:true}}, fields:[
     {name:"machine_id", type:"string", req:true, desc:"id mesin (auto-register bila baru)"},
