@@ -80,7 +80,7 @@ Di `internal/routes/routes.go`:
 5. `POST /penginapan/webhooks/midtrans` + `POST /penginapan/webhooks/xendit` — **public** (dipanggil gateway tanpa auth; daftar di root `r` untuk menghindari konflik static/param gin); response format standar; signature/token diverifikasi di handler.
 6. Group `auth.AuthMiddleware()` (seragam — satunya middleware untuk semua route protected; ganti `middleware.ApiKeyAuth` lama): `GET /activity/logs`, `GET /vending/config`, `POST /vending/device/status`, `GET /vending/media`, `POST /gate`, `POST /checkin-mandiri`, `GET /boardingpass` (list), `GET/POST /boardingpass`, `GET/PUT/DELETE /boardingpass/:id`, `POST/GET/DELETE /boardingpass/:id/ktp`, `POST/GET/DELETE /boardingpass/:id/tiket` (gambar opsional KTP/tiket).
 7. `POST /auth` (login → JWT; `GET /auth/key` sudah DIHAPUS).
-8. Group `auth.AuthMiddleware()` — `GET /tujuan`, `GET /po`, `GET/POST/PUT/DELETE /boarding*`.
+8. Group `auth.AuthMiddleware()` — `GET /tujuan`, `GET /po`, `GET /bus`, `GET/POST/PUT/DELETE /boarding*`.
 9. Group `peng := r.Group("/penginapan")` + `auth.AuthMiddleware()` — configs, **`GET /qris`**, payment-methods, purchase-sources, locations, rooms (+`PUT /rooms/:id/status`), room-layouts, guests (+`/guests/:id/checkout`, `/guests/:id/pindah`, `/guests/:id/histories`), payments (+`POST /payments/:id/pay`), **`GET /payment-gateway`**, room-histories.
 
 **Auth seragam** (`auth.AuthMiddleware`, berlaku untuk SEMUA route protected — gate/checkin/boardingpass/tujuan/po/boarding/penginapan; sumber data **`ttpg_users`** via env `USERS_DSN`):

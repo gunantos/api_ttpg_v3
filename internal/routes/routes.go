@@ -95,7 +95,7 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 
 	api.GET("/po", func(c *gin.Context) {
 		var data []struct {
-			IDPO   int    `json:"id_po"`
+			IDPO   string `json:"id_po"`
 			NamaPO string `json:"nama_po"`
 		}
 		if err := mainDB.Table("tbl_po").Select("id_po, nama_po").Order("id_po asc").Scan(&data).Error; err != nil {
@@ -103,6 +103,50 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 			return
 		}
 		response.Success(c, http.StatusOK, "Data po ditemukan", data, nil)
+	})
+
+	api.GET("/bus", func(c *gin.Context) {
+		q := strings.TrimSpace(c.Query("q"))
+		if q == "" {
+			q = strings.TrimSpace(c.Query("search"))
+		}
+		limit := 20
+		if v := strings.TrimSpace(c.Query("limit")); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 || n > 100 {
+				response.Error(c, http.StatusBadRequest, "limit harus 1-100", []response.ErrorItem{{Field: "limit", Code: "VALIDATION_ERROR", Detail: "limit harus 1-100"}})
+				return
+			}
+			limit = n
+		}
+		var data []struct {
+			IDBus        int    `json:"id_bus" gorm:"column:id_bus"`
+			Kode         string `json:"kode" gorm:"column:kode"`
+			Nopol        string `json:"nopol" gorm:"column:nopol"`
+			IDPO         string `json:"id_po" gorm:"column:id_po"`
+			NmPerusahaan string `json:"nm_perusahaan" gorm:"column:nm_perusahaan"`
+			Trayek1      string `json:"trayek1" gorm:"column:trayek1"`
+			Trayek2      string `json:"trayek2" gorm:"column:trayek2"`
+			JenisBus     string `json:"jenis_bus" gorm:"column:jenis_bus"`
+			Pnp          int    `json:"pnp" gorm:"column:pnp"`
+			Status       string `json:"status" gorm:"column:status"`
+		}
+		dbq := mainDB.Table("tbl_bus").Select("id_bus, kode, nopol, id_po, nm_perusahaan, trayek1, trayek2, jenis_bus, pnp, status")
+		if v := strings.TrimSpace(c.Query("id_po")); v != "" {
+			dbq = dbq.Where("id_po = ?", v)
+		}
+		if v := strings.TrimSpace(c.Query("status")); v != "" {
+			dbq = dbq.Where("status = ?", v)
+		}
+		if q != "" {
+			like := "%" + q + "%"
+			dbq = dbq.Where("kode LIKE ? OR nopol LIKE ? OR trayek1 LIKE ? OR trayek2 LIKE ? OR nm_perusahaan LIKE ? OR id_po LIKE ?", like, like, like, like, like, like)
+		}
+		if err := dbq.Order("nopol asc, id_bus asc").Limit(limit).Find(&data).Error; err != nil {
+			response.Error(c, http.StatusInternalServerError, "Gagal mengambil data bus", []response.ErrorItem{{Code: "DB_ERROR", Detail: err.Error()}})
+			return
+		}
+		response.Success(c, http.StatusOK, "Data bus ditemukan", data, nil)
 	})
 
 	api.GET("/boarding", func(c *gin.Context) {

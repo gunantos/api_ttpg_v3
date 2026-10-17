@@ -397,8 +397,32 @@ Auth seragam (JWT / Basic / API key — lihat [Autentikasi](#autentikasi)). Hany
 
 ```json
 { "success": true, "message": "Data po ditemukan",
-  "data": [ { "id_po": 1, "nama_po": "…" } ] }
+  "data": [ { "id_po": "PO001", "nama_po": "…" } ] }
 ```
+
+---
+
+### GET `/bus`
+
+Auth seragam (JWT / Basic / API key — lihat [Autentikasi](#autentikasi)). Data `tbl_bus` (MySQL `ttpg`) untuk autocomplete bus di frontend. Query opsional:
+
+- `q` / `search` — LIKE pada `kode`, `nopol`, `trayek1`, `trayek2`, `nm_perusahaan`, `id_po`
+- `id_po` — filter exact PO
+- `status` — filter exact (`1` = aktif)
+- `limit` — 1–100, default 20
+
+Urut `nopol ASC, id_bus ASC`.
+
+`200`:
+
+```json
+{ "success": true, "message": "Data bus ditemukan",
+  "data": [ { "id_bus": 4, "kode": "101010", "nopol": "B7013BGA", "id_po": "PO009",
+              "nm_perusahaan": "PT. ARIMBI JAYA AGUNG", "trayek1": "…", "trayek2": "…",
+              "jenis_bus": "ac", "pnp": 44, "status": "1" } ] }
+```
+
+`400` bila `limit` tidak valid.
 
 ---
 

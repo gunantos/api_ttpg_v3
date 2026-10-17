@@ -325,8 +325,18 @@ const GROUPS = [
  {id:"tujuan", method:"GET", path:"/tujuan", auth:"jwt", desc:"Daftar tujuan (tbl_tujuan, semua kolom), urut id_tujuan.",
   responses:[{code:200, label:"OK", example:{success:true, message:"Data tujuan ditemukan", data:[{id_tujuan:1, tujuan:"Jakarta", kawasan:"Jawa", kode_tujuan:""}]}}]},
  {id:"po", method:"GET", path:"/po", auth:"jwt", desc:"Daftar PO — hanya id_po & nama_po, urut id_po.",
-  responses:[{code:200, label:"OK", example:{success:true, message:"Data po ditemukan", data:[{id_po:1, nama_po:"PO Contoh"}]}}]}
+  responses:[{code:200, label:"OK", example:{success:true, message:"Data po ditemukan", data:[{id_po:"PO001", nama_po:"PO Contoh"}]}}]}
 ]},
+{id:"bus", title:"Bus (MySQL)", items:[
+ {id:"bus-list", method:"GET", path:"/bus", auth:"jwt", desc:"Autocomplete tbl_bus. Query: q/search (LIKE kode/nopol/trayek/nm_perusahaan/id_po), id_po, status, limit (1-100, default 20).",
+  params:[
+    {name:"q", in:"query", type:"string", req:false, desc:"kata kunci"},
+    {name:"id_po", in:"query", type:"string", req:false, desc:"filter PO"},
+    {name:"status", in:"query", type:"string", req:false, desc:"filter status (1=aktif)"},
+    {name:"limit", in:"query", type:"int", req:false, desc:"1-100, default 20"}],
+  responses:[
+    {code:200, label:"OK", example:{success:true, message:"Data bus ditemukan", data:[{id_bus:4, kode:"101010", nopol:"B7013BGA", id_po:"PO009", nm_perusahaan:"PT. ARIMBI JAYA AGUNG", trayek1:"…", trayek2:"…", jenis_bus:"ac", pnp:44, status:"1"}]}},
+    {code:400, label:"Invalid", example:{error:"limit harus 1-100"}}]}]},
 {id:"boarding", title:"Boarding (MongoDB)", items:[
  {id:"b-list", method:"GET", path:"/boarding", auth:"jwt", desc:"List dokumen koleksi ttpg.boarding (wajib paginasi). destination_id menerima int / string \"395\" / object {id_tujuan}; filter memakai $or ketiganya.",
   params:[
