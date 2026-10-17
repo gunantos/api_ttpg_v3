@@ -290,6 +290,23 @@ const GROUPS = [
   responses:[
     {code:200, label:"OK", example:{message:"boardingpass berhasil dihapus"}},
     {code:404, label:"Tidak ada", example:{error:"boardingpass tidak ditemukan"}}]},
+ {id:"bp-img-upload", method:"POST", path:"/boardingpass/:id/ktp", auth:"apikey", desc:"Upload gambar opsional (KTP atau tiket). Multipart form-data field 'file'; max 5MB; JPG/PNG/WebP. Path statis juga /boardingpass/:id/tiket. Upload ulang mengganti file lama.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id boardingpass"}],
+  body:{example:{file:"<binary image>"}},
+  responses:[
+    {code:200, label:"OK", example:{id:123, kind:"ktp", ktp_photo:"bp123_ktp_1700000000_abcd.png", message:"gambar berhasil disimpan"}},
+    {code:400, label:"Invalid", example:{error:"format gambar harus JPG, PNG, atau WebP"}},
+    {code:404, label:"Tidak ada", example:{error:"boardingpass tidak ditemukan"}}]},
+ {id:"bp-img-get", method:"GET", path:"/boardingpass/:id/ktp", auth:"apikey", desc:"Ambil bytes gambar (Content-Type sesuai file; cache private 24 jam). Path statis juga /boardingpass/:id/tiket.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id boardingpass"}],
+  responses:[
+    {code:200, label:"OK", example:{note:"binary image"}},
+    {code:404, label:"Tidak ada", example:{error:"gambar belum ada"}}]},
+ {id:"bp-img-delete", method:"DELETE", path:"/boardingpass/:id/ktp", auth:"apikey", desc:"Hapus gambar + set NULL. Path statis juga /boardingpass/:id/tiket.",
+  params:[{name:"id", in:"path", type:"int", req:true, desc:"id boardingpass"}],
+  responses:[
+    {code:200, label:"OK", example:{id:123, kind:"ktp", ktp_photo:null, message:"gambar berhasil dihapus"}},
+    {code:404, label:"Tidak ada", example:{error:"boardingpass tidak ditemukan"}}]},
  {id:"print", method:"GET", path:"/boarding/print/:code", auth:"none", desc:"Public. HTML siap cetak 78mm + QR. :code = noreg ATAU ticket_id (deleted IS NULL). Alias lama: GET /boardingpass/print/:code (sama persis).",
   params:[
     {name:"code", in:"path", type:"string", req:true, desc:"noreg atau ticket_id"},

@@ -330,6 +330,35 @@ Auth seragam†. Soft delete (`deleted = NOW()`, baris tetap ada tapi disembunyi
 - `404` `{"error": "boardingpass tidak ditemukan"}` (tidak ada atau sudah terhapus)
 - `400` id tidak valid
 
+### Gambar opsional boardingpass (KTP / tiket)
+
+Auth seragam†. `:kind` pada path = `ktp` atau `tiket` (alias path statis `/boardingpass/:id/ktp` dan `/boardingpass/:id/tiket`). File disimpan di `$UPLOAD_DIR/boardingpass/{ktp|tiket}` dengan nama yang dibuat server: `bp<id>_<kind>_<ts>_<rand>.<ext>` (jpg/png/webp). Upload ulang mengganti file lama; `GET /boardingpass/:id` menampilkan `ktp_photo`/`ticket_photo` (null bila belum ada).
+
+- Maks 5MB, format JPG/PNG/WebP (deteksi via content-type, bukan ekstensi).
+- `GET` mengembalikan bytes gambar + `Content-Type` sesuai file (cache private 24 jam).
+- Hanya boardingpass yang belum dihapus (`deleted IS NULL`).
+
+#### POST `/boardingpass/:id/:kind` (upload)
+
+Multipart `form-data`, field `file`.
+
+- `200` `{"id": 123, "kind": "ktp", "ktp_photo": "bp123_ktp_…png", "message": "gambar berhasil disimpan"}`
+- `400` id tidak valid, kind tidak valid, file wajib, ukuran >5MB, format bukan JPG/PNG/WebP
+- `404` boardingpass tidak ditemukan / sudah dihapus
+- `500` gagal simpan file/DB
+
+#### GET `/boardingpass/:id/:kind` (ambil gambar)
+
+- `200` bytes gambar
+- `400` id/kind tidak valid
+- `404` boardingpass tidak ada, gambar belum ada, atau file hilang di disk
+
+#### DELETE `/boardingpass/:id/:kind` (hapus)
+
+- `200` `{"id": 123, "kind": "ktp", "ktp_photo": null, "message": "gambar berhasil dihapus"}`
+- `400` id/kind tidak valid
+- `404` boardingpass tidak ditemukan / sudah dihapus
+
 ### GET `/boarding/print/:code`
 
 **Public (tanpa auth).** Response `200` = HTML siap cetak (ukuran 78mm, QR dari `qrcodejs`). URL lama `GET /boardingpass/print/:code` tetap berfungsi sebagai alias.
