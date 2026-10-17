@@ -124,6 +124,7 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 			Kode           string `json:"kode" gorm:"column:kode"`
 			Nopol          string `json:"nopol" gorm:"column:nopol"`
 			IDPO           string `json:"id_po" gorm:"column:id_po"`
+			NamaPO         string `json:"nama_po" gorm:"column:nama_po"`
 			NmPerusahaan   string `json:"nm_perusahaan" gorm:"column:nm_perusahaan"`
 			Trayek1        string `json:"trayek1" gorm:"column:trayek1"`
 			Trayek2        string `json:"trayek2" gorm:"column:trayek2"`
@@ -139,9 +140,10 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 			Rute           string `json:"rute" gorm:"column:rute"`
 		}
 		dbq := mainDB.Table("tbl_bus b").
-			Select("b.id_bus, b.kode, b.nopol, b.id_po, b.nm_perusahaan, b.trayek1, b.trayek2, b.jenis_bus, b.pnp, b.status, b.trayek_main_id, " +
+			Select("b.id_bus, b.kode, b.nopol, b.id_po, COALESCE(p.nama_po,'') AS nama_po, b.nm_perusahaan, b.trayek1, b.trayek2, b.jenis_bus, b.pnp, b.status, b.trayek_main_id, " +
 				"COALESCE(t.kode_trayek,'') AS trayek_kode, COALESCE(t.asal,0) AS asal_id, COALESCE(ta.tujuan,'') AS asal, " +
 				"COALESCE(t.tujuan,0) AS tujuan_id, COALESCE(tu.tujuan,'') AS tujuan, COALESCE(t.rute,'') AS rute").
+			Joins("LEFT JOIN tbl_po p ON p.id_po = b.id_po").
 			Joins("LEFT JOIN terminal_trayek_main t ON t.id = b.trayek_main_id").
 			Joins("LEFT JOIN tbl_tujuan ta ON ta.id_tujuan = t.asal").
 			Joins("LEFT JOIN tbl_tujuan tu ON tu.id_tujuan = t.tujuan")
