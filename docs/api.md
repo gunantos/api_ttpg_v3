@@ -432,7 +432,7 @@ Urut `nopol ASC, id_bus ASC`.
               "jenis_bus": "ac", "pnp": 44, "status": "1",
               "trayek_main_id": 3, "trayek_kode": "0000000000",
               "asal_id": 18, "asal": "Jakarta (Pulo Gebang)",
-              "tujuan_id": 643, "tujuan": "…",
+              "tujuan_id": 643, "tujuan": "Magelang",
               "rute": "MERAK-TOL MERAK-…-JAKARTA(PULO)" } ] }
 ```
 

@@ -352,7 +352,7 @@ const GROUPS = [
     {name:"status", in:"query", type:"string", req:false, desc:"filter status (1=aktif)"},
     {name:"limit", in:"query", type:"int", req:false, desc:"1-100, default 20"}],
   responses:[
-    {code:200, label:"OK", example:{success:true, message:"Data bus ditemukan", data:[{id_bus:4, kode:"101010", nopol:"B7013BGA", id_po:"PO009", nm_perusahaan:"PT. ARIMBI JAYA AGUNG", trayek1:"…", trayek2:"…", jenis_bus:"ac", pnp:44, status:"1"}]}},
+    {code:200, label:"OK", example:{success:true, message:"Data bus ditemukan", data:[{id_bus:4, kode:"101010", nopol:"B7013BGA", id_po:"PO009", nama_po:"PO Contoh", nm_perusahaan:"PT. ARIMBI JAYA AGUNG", trayek1:"…", trayek2:"…", jenis_bus:"ac", pnp:44, status:"1", trayek_main_id:3, trayek_kode:"0000000000", asal_id:18, asal:"Jakarta Timur", tujuan_id:643, tujuan:"Magelang", rute:"MERAK-…-JAKARTA(PULO)"}]}},
     {code:400, label:"Invalid", example:{error:"limit harus 1-100"}}]}]},
 {id:"boarding", title:"Boarding (MongoDB)", items:[
  {id:"b-list", method:"GET", path:"/boarding", auth:"jwt", desc:"List dokumen koleksi ttpg.boarding (wajib paginasi). destination_id menerima int / string \"395\" / object {id_tujuan}; filter memakai $or ketiganya.",
