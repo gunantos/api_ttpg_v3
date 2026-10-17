@@ -120,29 +120,42 @@ func RegisterRoutes(r *gin.Engine, mainDB *gorm.DB, mongoClient *mongo.Client) {
 			limit = n
 		}
 		var data []struct {
-			IDBus        int    `json:"id_bus" gorm:"column:id_bus"`
-			Kode         string `json:"kode" gorm:"column:kode"`
-			Nopol        string `json:"nopol" gorm:"column:nopol"`
-			IDPO         string `json:"id_po" gorm:"column:id_po"`
-			NmPerusahaan string `json:"nm_perusahaan" gorm:"column:nm_perusahaan"`
-			Trayek1      string `json:"trayek1" gorm:"column:trayek1"`
-			Trayek2      string `json:"trayek2" gorm:"column:trayek2"`
-			JenisBus     string `json:"jenis_bus" gorm:"column:jenis_bus"`
-			Pnp          int    `json:"pnp" gorm:"column:pnp"`
-			Status       string `json:"status" gorm:"column:status"`
+			IDBus          int    `json:"id_bus" gorm:"column:id_bus"`
+			Kode           string `json:"kode" gorm:"column:kode"`
+			Nopol          string `json:"nopol" gorm:"column:nopol"`
+			IDPO           string `json:"id_po" gorm:"column:id_po"`
+			NmPerusahaan   string `json:"nm_perusahaan" gorm:"column:nm_perusahaan"`
+			Trayek1        string `json:"trayek1" gorm:"column:trayek1"`
+			Trayek2        string `json:"trayek2" gorm:"column:trayek2"`
+			JenisBus       string `json:"jenis_bus" gorm:"column:jenis_bus"`
+			Pnp            int    `json:"pnp" gorm:"column:pnp"`
+			Status         string `json:"status" gorm:"column:status"`
+			TrayekMainID   int    `json:"trayek_main_id" gorm:"column:trayek_main_id"`
+			TrayekKode     string `json:"trayek_kode" gorm:"column:trayek_kode"`
+			AsalID         int    `json:"asal_id" gorm:"column:asal_id"`
+			Asal           string `json:"asal" gorm:"column:asal"`
+			TujuanID       int    `json:"tujuan_id" gorm:"column:tujuan_id"`
+			Tujuan         string `json:"tujuan" gorm:"column:tujuan"`
+			Rute           string `json:"rute" gorm:"column:rute"`
 		}
-		dbq := mainDB.Table("tbl_bus").Select("id_bus, kode, nopol, id_po, nm_perusahaan, trayek1, trayek2, jenis_bus, pnp, status")
+		dbq := mainDB.Table("tbl_bus b").
+			Select("b.id_bus, b.kode, b.nopol, b.id_po, b.nm_perusahaan, b.trayek1, b.trayek2, b.jenis_bus, b.pnp, b.status, b.trayek_main_id, " +
+				"COALESCE(t.kode_trayek,'') AS trayek_kode, COALESCE(t.asal,0) AS asal_id, COALESCE(ta.tujuan,'') AS asal, " +
+				"COALESCE(t.tujuan,0) AS tujuan_id, COALESCE(tu.tujuan,'') AS tujuan, COALESCE(t.rute,'') AS rute").
+			Joins("LEFT JOIN terminal_trayek_main t ON t.id = b.trayek_main_id").
+			Joins("LEFT JOIN tbl_tujuan ta ON ta.id_tujuan = t.asal").
+			Joins("LEFT JOIN tbl_tujuan tu ON tu.id_tujuan = t.tujuan")
 		if v := strings.TrimSpace(c.Query("id_po")); v != "" {
-			dbq = dbq.Where("id_po = ?", v)
+			dbq = dbq.Where("b.id_po = ?", v)
 		}
 		if v := strings.TrimSpace(c.Query("status")); v != "" {
-			dbq = dbq.Where("status = ?", v)
+			dbq = dbq.Where("b.status = ?", v)
 		}
 		if q != "" {
 			like := "%" + q + "%"
-			dbq = dbq.Where("kode LIKE ? OR nopol LIKE ? OR trayek1 LIKE ? OR trayek2 LIKE ? OR nm_perusahaan LIKE ? OR id_po LIKE ?", like, like, like, like, like, like)
+			dbq = dbq.Where("b.kode LIKE ? OR b.nopol LIKE ? OR b.trayek1 LIKE ? OR b.trayek2 LIKE ? OR b.nm_perusahaan LIKE ? OR b.id_po LIKE ? OR t.kode_trayek LIKE ? OR ta.tujuan LIKE ? OR tu.tujuan LIKE ? OR t.rute LIKE ?", like, like, like, like, like, like, like, like, like, like)
 		}
-		if err := dbq.Order("nopol asc, id_bus asc").Limit(limit).Find(&data).Error; err != nil {
+		if err := dbq.Order("b.nopol asc, b.id_bus asc").Limit(limit).Find(&data).Error; err != nil {
 			response.Error(c, http.StatusInternalServerError, "Gagal mengambil data bus", []response.ErrorItem{{Code: "DB_ERROR", Detail: err.Error()}})
 			return
 		}

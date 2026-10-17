@@ -419,7 +419,11 @@ Urut `nopol ASC, id_bus ASC`.
 { "success": true, "message": "Data bus ditemukan",
   "data": [ { "id_bus": 4, "kode": "101010", "nopol": "B7013BGA", "id_po": "PO009",
               "nm_perusahaan": "PT. ARIMBI JAYA AGUNG", "trayek1": "…", "trayek2": "…",
-              "jenis_bus": "ac", "pnp": 44, "status": "1" } ] }
+              "jenis_bus": "ac", "pnp": 44, "status": "1",
+              "trayek_main_id": 3, "trayek_kode": "0000000000",
+              "asal_id": 18, "asal": "Jakarta (Pulo Gebang)",
+              "tujuan_id": 643, "tujuan": "…",
+              "rute": "MERAK-TOL MERAK-…-JAKARTA(PULO)" } ] }
 ```
 
 `400` bila `limit` tidak valid.

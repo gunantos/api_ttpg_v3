@@ -328,7 +328,7 @@ const GROUPS = [
   responses:[{code:200, label:"OK", example:{success:true, message:"Data po ditemukan", data:[{id_po:"PO001", nama_po:"PO Contoh"}]}}]}
 ]},
 {id:"bus", title:"Bus (MySQL)", items:[
- {id:"bus-list", method:"GET", path:"/bus", auth:"jwt", desc:"Autocomplete tbl_bus. Query: q/search (LIKE kode/nopol/trayek/nm_perusahaan/id_po), id_po, status, limit (1-100, default 20).",
+ {id:"bus-list", method:"GET", path:"/bus", auth:"jwt", desc:"Autocomplete tbl_bus (join terminal_trayek_main + tbl_tujuan asal/tujuan). Query: q/search (LIKE kode/nopol/trayek/nm_perusahaan/id_po/rute/asal/tujuan), id_po, status, limit (1-100, default 20).",
   params:[
     {name:"q", in:"query", type:"string", req:false, desc:"kata kunci"},
     {name:"id_po", in:"query", type:"string", req:false, desc:"filter PO"},
