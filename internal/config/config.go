@@ -25,6 +25,7 @@ type Config struct {
 	DamriPassword               string
 	DamriBaseURL                string
 	DamriTimeoutSeconds         int
+	SignageOfflineSeconds	int		`gorm:"column:signage_offline_seconds" json:"signage_offline_seconds"`
 	IgnoredMongoUserIDs         []int
 	LogRetentionDays            int
 	UploadDir                   string

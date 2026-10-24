@@ -31,6 +31,21 @@ a{color:var(--blue);text-decoration:none}
 .btn.primary{background:linear-gradient(135deg,var(--acc),var(--acc2));border-color:var(--acc);color:#fff;box-shadow:0 8px 24px rgba(99,102,241,.35)}
 .btn.ghost{background:transparent}
 .btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Button Group Styles */
+.btn-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.btn-group .btn { flex: 1; min-width: 40px; }
+.btn-group .btn.active { border-width: 2px; border-radius: 6px 6px 0 0; }
+.btn-group .btn:not(.active) { border-width: 1px; }
+/* Layer control group */
+.layer-control { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.layer-control .btn { flex: 0 0 auto; min-width: 30px; height: 30px; padding: 0; font-size: 14px; line-height: 1; border-radius: 0; }
+/* Pagination group */
+.pagination { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.pagination .btn { flex: 1; min-width: 36px; height: 36px; padding: 6px 10px; font-size: 12px; }
+/* Action group */
+.action-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.action-group .btn { flex: 1; min-width: 80px; }
 .pill{display:inline-flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:11px;color:var(--mut)}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.err{color:var(--err)}
 .banner{border-radius:12px;padding:10px 14px;margin-bottom:14px;display:none;font-size:13px}
@@ -128,6 +143,8 @@ input:focus,select:focus{border-color:var(--acc)}
     <nav class="smenu">
       <a href="#" data-view="dashboard" class="on"><span>📊</span> <span class="sb-label">Dashboard</span></a>
       <a href="#" data-view="logs"><span>📝</span> <span class="sb-label">Log Request</span></a>
+
+      <a href="#" data-view="device"><span>📟</span> <span class="sb-label">Device</span></a>
       <a href="#" data-view="boarding"><span>✈️</span> <span class="sb-label">Boarding Data</span></a>
       <a href="/docs" target="_blank" rel="noopener noreferrer"><span>📄</span> <span class="sb-label">API Docs ↗</span></a>
       <a href="/activity" target="_blank" rel="noopener noreferrer"><span>📋</span> <span class="sb-label">Log Klasik ↗</span></a>
@@ -262,7 +279,7 @@ input:focus,select:focus{border-color:var(--acc)}
         <tbody id="rows"></tbody>
       </table>
       </div>
-      <div class="pager flex gap-2 items-center justify-end mt-3 text-slate-500 text-sm"><span id="pageinfo"></span><button class="btn" id="prev">Prev</button><button class="btn" id="next">Next</button></div>
+      <div class="pager flex gap-2 items-center justify-end mt-3 text-slate-500 text-sm"><span id="pageinfo"></span><div class="pagination"><button class="btn active" id="prev">Prev</button><button class="btn" id="next">Next</button></div></div>
     </div>
   </section>
 
@@ -400,6 +417,59 @@ async function fetchBoardingStats(){
 
 function showView(name){
   document.querySelectorAll('.view').forEach(v=>{ v.classList.toggle('hidden', v.id!=='view-'+name); });
+
+<section id="view-device" class="view space-y-6">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <!-- Total Device Card -->
+    <div class="card bg-blue-500/10 border-blue-200/20">
+      <div class="p-6">
+        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Total Device</p>
+        <p id="deviceTotal" class="text-4xl font-bold text-blue-600">0</p>
+      </div>
+    </div>
+    <!-- Active Device Card -->
+    <div class="card bg-green-500/10 border-green-200/20">
+      <div class="p-6">
+        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Aktif</p>
+        <p id="deviceActive" class="text-4xl font-bold text-green-600">0</p>
+      </div>
+    </div>
+    <!-- Non-aktif Device Card -->
+    <div class="card bg-red-500/10 border-red-200/20">
+      <div class="p-6">
+        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Non-aktif</p>
+        <p id="deviceNonactive" class="text-4xl font-bold text-red-600">0</p>
+      </div>
+    </div>
+  </div>
+  <!-- Status badges -->
+  <div class="mt-6 grid grid-cols-2 gap-4">
+    <div class="card p-4">
+      <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Status Keseluruhan</p>
+      <p id="deviceStatus" class="text-lg font-medium text-slate-600">Menyiapkan...</p>
+    </div>
+    <div class="card p-4">
+      <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Last Update</p>
+      <p id="deviceLastUpdate" class="text-sm text-slate-500"></p>
+    </div>
+  </div>
+</section>
+  <section id="view-device" class="view space-y-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="card">
+        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Total Device</p>
+        <p id="deviceTotal" class="text-3xl font-bold"></p>
+      </div>
+      <div class="card">
+        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Aktif</p>
+        <p id="deviceActive" class="text-3xl font-bold"></p>
+      </div>
+      <div class="card">
+        <p class="text-xs text-slate-500 uppercase font-semibold tracking-wide">Non-aktif</p>
+        <p id="deviceNonactive" class="text-3xl font-bold"></p>
+      </div>
+    </div>
+  </section>
   document.querySelectorAll('[data-view]').forEach(l=>{ l.classList.toggle('on', l.dataset.view===name); });
   const titles={dashboard:'Dashboard',logs:'Log Request',boarding:'Boarding Data'};
   if($('viewTitle')) $('viewTitle').textContent=titles[name]||'Dashboard';
@@ -562,7 +632,113 @@ const _mob=$('btnMobileSidebar'); if(_mob) _mob.addEventListener('click',()=>{ c
 const _bcm=$('btnCloseBoardingModal'); if(_bcm) _bcm.addEventListener('click',closeBoardingModal);
 const _bmodal=$('boardingModal'); if(_bmodal) _bmodal.addEventListener('click',e=>{ if(e.target && e.target.id==='boardingModal') closeBoardingModal(); });
 showTokenBox();
-</script>
+
+// Layer control button group
+enhanceLayerControls = function(){
+  const rows = document.querySelectorAll('.sl-layer-row');
+  rows.forEach(row => {
+    const layerId = row.dataset.slLayer;
+    if(!layerId) return;
+    // Check if already wrapped
+    if(row.querySelector('.layer-control')) return;
+    // Wrap the action buttons in a group
+    const actions = row.querySelectorAll('[data-sl-zup],[data-sl-zdown],[data-sl-ldel]');
+    if(actions.length > 0) {
+      // Remove existing buttons
+      actions.forEach(b => b.remove());
+      // Create wrapper
+      const wrapper = document.createElement('div');
+      wrapper.className = 'layer-control';
+      // Create Up button
+      const btnUp = document.createElement('button');
+      btnUp.type = 'button';
+      btnUp.className = 'btn';
+      btnUp.title = 'Naikkan layer';
+      btnUp.innerHTML = '↑';
+      // Create Down button
+      const btnDown = document.createElement('button');
+      btnDown.type = 'button';
+      btnDown.className = 'btn';
+      btnDown.title = 'Turunkan layer';
+      btnDown.innerHTML = '↓';
+      // Create Delete button
+      const btnDel = document.createElement('button');
+      btnDel.type = 'button';
+      btnDel.className = 'btn';
+      btnDel.title = 'Hapus layer';
+      btnDel.innerHTML = 'Hapus';
+      // Append buttons to wrapper
+      wrapper.appendChild(btnUp);
+      wrapper.appendChild(btnDown);
+      wrapper.appendChild(btnDel);
+      // Insert wrapper after the layer type label
+      const label = row.querySelector('.sl-type-pill');
+      if(label) {
+        const next = label.nextSibling;
+        row.insertBefore(wrapper, next);
+      } else {
+        row.prepend(wrapper);
+      }
+    }
+  });
+}
+
+// Run on load and when view changes
+window.addEventListener('load', enhanceLayerControls);
+const origShowView = window.showView;
+if(origShowView) {
+  window.showView = function(name) {
+    origShowView(name);
+    setTimeout(enhanceLayerControls, 100);
+  };
+}
+// Device Statistics Function
+async function loadDeviceStats() {
+  try {
+    const r = await fetch("/signage/devices/stats", {headers: {Authorization: "Bearer " + token}});
+    if (!r.ok) return;
+    const data = await r.json();
+    // Update total devices
+    const totalEl = $("#deviceTotal");
+    if(totalEl) totalEl.text(data.total || 0);
+    
+    // Update active devices
+    const activeEl = $("#deviceActive");
+    if(activeEl) activeEl.text(data.active || 0);
+    
+    // Update non-aktif devices
+    const nonActiveEl = $("#deviceNonactive");
+    if(nonActiveEl) nonActiveEl.text(data.non_active || 0);
+    
+    // Update status badge
+    const statusEl = $("#deviceStatus");
+    if(statusEl) {
+      const total = data.total || 0;
+      const active = data.active || 0;
+      if(total > 0 && active === total) {
+        statusEl.innerHTML = '<span class="text-green-500">Semua Aktif</span>';
+      } else if(active > 0) {
+        statusEl.innerHTML = '<span class="text-yellow-500"> sebagian aktif</span>';
+      } else {
+        statusEl.innerHTML = '<span class="text-red-500">Non-aktif</span>';
+      }
+    }
+    
+    // Update last update time
+    const lastEl = $("#deviceLastUpdate");
+    if(lastEl) {
+      const now = new Date();
+      lastEl.textContent = "Diupdate: " + now.toLocaleTimeString("id-ID");
+    }
+  } catch(e) { console.error("Gagal load device stats:", e); }
+}
+
+// Run on page load and interval
+$(document).on("click", "[data-view="device"]", function() {
+  showView("device");
+  loadDeviceStats();
+  setInterval(loadDeviceStats, 30000);
+});</script>
   </div>
 </div>
 </div>
