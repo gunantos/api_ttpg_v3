@@ -4,7 +4,7 @@ API Go (Gin) untuk gate, boardingpass, checkin mandiri, master tujuan/PO, manaje
 
 ## Fitur
 
-- **Auth**: login `POST /auth` → JWT (berlaku 1 minggu); seragam di semua route protected — JWT (Bearer), Basic, API key (`user.secret_key` di DB `ttpg_users` atau literal env `API_KEY`); aturan skema+izin per endpoint dari `api_url`/`access`, log async ke `logs` (body ikut dicatat **ter-redaksi**, hapus otomatis sesuai `LOG_RETENTION_DAYS`)
+- **Auth**: login `POST /auth` → JWT (berlaku 1 minggu); seragam di semua route protected — JWT (Bearer), Basic, API key (`user.secret_key` di DB `ttpg_users` atau literal env `API_KEY`); aturan skema+izin per endpoint dari `api_url`/`access`, log async ke `logs` (body **ter-redaksi**, hanya prefix 16KB yang dicatat — body request tetap utuh sampai ke handler; hapus otomatis sesuai `LOG_RETENTION_DAYS`)
 - **Gate**: scan noreg, fallback ke API tiket eksternal, aturan max 5 scan & expired 5 menit
 - **Checkin mandiri**: dari MongoDB `boarding`, opsional fallback Damri, auto-generate noreg `CM…`
 - **Boardingpass**: list (filter+limit/offset), create/get, update/delete (soft), print (cetak HTML + QR)
@@ -13,7 +13,7 @@ API Go (Gin) untuk gate, boardingpass, checkin mandiri, master tujuan/PO, manaje
 - **WebSocket** (`GET /ws?token=<JWT>`): push real-time perubahan kamar (create/update/status/occupancy/delete) dan tamu (checkin/checkout/pindah) ke semua client terautentikasi
 - **Dokumentasi interaktif** (`GET /docs`, public): halaman HTML dengan parameter, body, contoh respons, dan snippet **cURL / PHP / Python / Node.js / Go** per endpoint — plus fitur "Coba" (request langsung dari browser)
 - **Aktivitas & Log** (`GET /activity`, public): halaman riwayat request per user — status, data terkirim (query + body, rahasia disamarkan), IP, durasi; filter method/path/status/tanggal + paginasi; API `GET /activity/logs` (user biasa hanya melihat lognya sendiri, admin semua). Log lama dihapus otomatis (`LOG_RETENTION_DAYS`, default 30 hari)
-- **Vending / mesin OTOMAT** (`GET /vending/config`, `POST /vending/device/status`, `GET /vending/media`; auth seragam): bundle config per mesin (global + override, **merge di server**), auto-register `status=pending`, heartbeat 30 detik (`last_seen_at`, `extra`), katalog media attract — DB `ttpg` (`vending_machines`/`vending_configs`/`vending_media`, migration `006`)
+- **Vending / mesin OTOMAT** (`GET /vending/config`, `POST /vending/device/status`, `GET /vending/media`; auth seragam): bundle config per mesin (global + override, **merge di server**), auto-register `status=pending`, heartbeat 30 detik (`last_seen_at`, `extra`), katalog media attract + **admin media CRUD** (`/vending/admin/media`, purpose `media`/`screensaver`, upload file atau unduh **YouTube/URL via yt-dlp**; file publik di `/uploads/vending/`); **screensaver bisa ditarget ke device tertentu atau semua device** (`vending_media_devices`, tanpa assignment = semua) — DB `ttpg` (`devices` untuk vending+signage, `vending_configs`/`vending_media` + playlist/playback, migration `006` + `018` + `019` + `020`)
 
 ## Persyaratan
 
@@ -36,7 +36,7 @@ go run main.go
 #    http://localhost:3080/docs
 ```
 
-Seed auth: `migrations/mysql/004_create_ttpg_users.sql` (DB `ttpg_users`) — `admin`/`admin123` (`secret_key=dev-key-123`, `all_access=y`) dan `limited`/`limited123` (akses terbatas, dipakai test aturan endpoint). `go run cmd/seed/main.go` masih mengisi legacy `ttpg_auth` (`production_key=prod-key-123`, `development_key=dev-key-123`) — tidak dipakai auth lagi.
+Seed auth: `migrations/mysql/004_create_ttpg_users.sql` (DB `ttpg_users`) — `admin`/`Admin123` (`secret_key=dev-key-123`, `all_access=y`) dan `limited`/`limited123` (akses terbatas, dipakai test aturan endpoint). `go run cmd/seed/main.go` masih mengisi legacy `ttpg_auth` (`production_key=prod-key-123`, `development_key=dev-key-123`) — tidak dipakai auth lagi.
 
 ## Akses dari Komputer Lain
 
@@ -79,7 +79,7 @@ Server sudah listen di **semua interface** (`0.0.0.0`), jadi otomatis bisa diaks
    ```bash
    curl -X POST http://192.168.1.50:3080/auth \
         -H "Content-Type: application/json" \
-        -d '{"username":"admin","password":"admin123"}'
+        -d '{"username":"admin","password":"Admin123"}'
    ```
 
    Harus balas `200` dengan `token`. Jika timeout, firewall/port belum dibuka; jika `connection refused`, server belum jalan atau salah IP.
@@ -130,14 +130,14 @@ internal/
   platform/database/     # ConnectMySQL, ConnectMongo
   handler/               # gate, boardingpass, checkin_mandiri, print_boardingpass,
                          # penginapan_config, penginapan_master, penginapan_guest, penginapan_payment,
-                         # penginapan_receipt, penginapan_gateway, activity, vending, ws
+                         # penginapan_receipt, penginapan_gateway, activity, vending, digital_signage, devices, ws
   activity/              # halaman UI /activity (embed HTML: riwayat log request user)
   payment/               # gateway pluggable: Gateway interface + registry; midtrans.go, xendit.go
   client/                # TicketClient, DamriClient
   docs/                  # api.html + docs.go (embed halaman /docs)
   routes/routes.go       # registrasi semua route
-scripts/testing/         # smoke test lokal (380 assert) + reset DB uji + wsclient/
-migrations/mysql/        # 001_create_ttpg_auth.sql, 002_create_ttpg_penginapan.sql (baru), 003_upgrade_penginapan_v2.sql, 004_create_ttpg_users.sql (skema auth + seed lokal), 005_upgrade_payments_gateway.sql (upgrade kolom gateway payments), 006_create_ttpg_vending.sql (tabel vending: machines/configs/media + seed config global), 007_upgrade_guests_ktp.sql (kolom ktp_photo guests), 008_upgrade_boardingpass_images.sql (kolom ktp_photo & ticket_photo terminal_boardingpass)
+scripts/testing/         # smoke test lokal (400 assert) + reset DB uji + wsclient/
+migrations/mysql/        # 001_create_ttpg_auth.sql, 002_create_ttpg_penginapan.sql (baru), 003_upgrade_penginapan_v2.sql, 004_create_ttpg_users.sql (skema auth + seed lokal), 005_upgrade_payments_gateway.sql (upgrade kolom gateway payments), 006_create_ttpg_vending.sql (tabel vending: machines/configs/media + seed config global), 007_upgrade_guests_ktp.sql (kolom ktp_photo guests), 008_upgrade_boardingpass_images.sql (kolom ktp_photo & ticket_photo terminal_boardingpass), 018_upgrade_vending_media_playlist.sql (kolom purpose/source_url vending_media + tabel playlist/playback; idempoten), 019_create_ttpg_devices.sql (tabel `devices` gabungan vending+signage + salin data lama; idempoten), 020_vending_screensaver_devices.sql (target screensaver per device / semua; idempoten)
 docs/api.md              # dokumentasi API lengkap
 ```
 
@@ -164,15 +164,25 @@ Contoh cepat:
 
 ```bash
 TOKEN=$(curl -s -X POST localhost:3080/auth -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"admin123"}' | jq -r .data.token)
+  -d '{"username":"admin","password":"Admin123"}' | jq -r .data.token)
 
 curl -s localhost:3080/tujuan -H "Authorization: Bearer $TOKEN"   # JWT
 curl -s localhost:3080/tujuan -H 'X-ttpg-key: dev-key-123'        # API key user (secret_key)
 curl -s localhost:3080/tujuan -H 'X-ttpg-key: 12345'              # superkey env API_KEY
-curl -s localhost:3080/tujuan -u admin:admin123                   # Basic
+curl -s localhost:3080/tujuan -u admin:Admin123                   # Basic
 ```
 
-Tanpa auth: `POST /auth`, `/boarding/print/:code` (alias lama: `/boardingpass/print/:code`), `/penginapan/payments/:id/receipt` (struk), `/penginapan/webhooks/midtrans`, `/penginapan/webhooks/xendit` (gateway), `/ws` (JWT via query `?token=`), `/docs`, `/activity` (UI log).
+Tanpa auth: `POST /auth`, `/boarding/print/:code` (alias lama: `/boardingpass/print/:code`), `/penginapan/payments/:id/receipt` (struk), `/penginapan/webhooks/midtrans`, `/penginapan/webhooks/xendit` (gateway), `/ws` (JWT via query `?token=`), `/docs`, `/activity` (UI log), `/login` (halaman login), `/uploads/vending/*` (file media vending), `/admin` + `/admin/{application,device,boarding,boardingpass,penginapan,gate,activity,vending,vending/media,vending/playlists,digital-signage}` (console, guard JWT di sisi klien).
+
+## Console Admin & Login
+
+- **`GET /login`** (public): halaman login modern (Tailwind + SweetAlert2) — form username/password, tombol **Login**, tekan **Enter** langsung submit. Sukses → token disimpan di `localStorage` (`ttpg_login_token`, `ttpg_login_user`, `ttpg_login_role`) lalu redirect ke `/admin`; gagal → dialog SweetAlert2.
+- **`GET /admin`** (public, guard klien): console dengan sidebar biru tua menempel penuh dari atas — grup **Utama** (Dashboard, Boarding, Boardingpass, Penginapan, Gate), grup **Application** (Device → `/admin/device`, Vending → `/admin/vending`, Digital Signage → `/admin/digital-signage`; menu Vending bertab **Config / Screensaver** (tab Media dihapus), Digital Signage bertab **Config / Screensaver / Media**), grup **Sistem** (Activity, **Docs → `/docs`**) — dan header di area konten berisi notifikasi + dropdown user (Profil/Setelan/Keluar); tanpa search bar. Tanpa token di `localStorage` → redirect `/login`; **Keluar** menghapus token → `/login`.
+- Semua path `/admin/*` dilayani handler yang sama (`internal/admin/admin.go`); menu aktif & judul halaman ditentukan dari `window.location.pathname`.
+- **Menu Application**: **Device** (`/admin/device`) = **monitoring gabungan** mesin vending + device digital signage (`GET /devices`, kolom Tipe/Status/last seen, filter tipe & status) + CRUD device (Tambah/Edit/Hapus memakai endpoint `/vending/machines` atau `/signage/devices` sesuai tipe); aksi **Kelola** mengarah ke menu konten terkait. **Vending** (`/admin/vending`) = tab **Config** (pilih mesin → bundle JSON dari `GET /vending/config?machine_id=`) dan **Screensaver** (CRUD `GET/POST/PUT/DELETE /vending/admin/media?purpose=screensaver`; upload file, impor URL, atau unduh YouTube via yt-dlp; **Atur Device** per baris (checkbox; tanpa centang = semua device) untuk memilih device tertentu atau semua device; tombol Edit/Hapus). Tab **Media** dihapus dari menu Vending (konten `purpose=media` tetap tersedia lewat API). **Digital Signage** (`/admin/digital-signage`) = tab **Config / Screensaver / Media** (masih placeholder — API signage baru menyediakan `/signage/devices`). Alias `/admin/application` menampilkan Device.
+- **Menu tabel** (search + filter + paginasi + CRUD tambah/edit/hapus): **Boarding** dan **Boardingpass** (`GET /boardingpass`), **Penginapan** (`GET /penginapan/guests`, filter/pagination di klien), **Gate** (`GET /activity/logs` dengan `path=/gate`), **Activity** (`GET /activity/logs`), **Vending Media** (`GET /vending/admin/media`), **Vending Playlists** (`GET /vending/playlists`). Toolbar berisi pencarian, filter (status/method/kode/tanggal sesuai menu), tombol muat ulang, tombol Tambah, dan pager (20 data/halaman). Modal form untuk tambah/edit.
+- Statistik dashboard diambil best-effort dari `GET /activity/logs` (diam bila gagal).
+- Catatan local: login memakai DB `ttpg_users` sesuai `USERS_DSN`; menjalankan server tanpa env akan menunjuk produksi — untuk uji lokal arahkan `USERS_DSN` ke Docker `127.0.0.1:13306` (lihat `scripts/testing/test_env_flags.sh`).
 
 ## Verifikasi
 
@@ -181,7 +191,7 @@ go build ./...
 go vet ./...
 ```
 
-Smoke test end-to-end (Docker MySQL+Mongo lokal, 380 assert) ada di [`scripts/testing/`](scripts/testing/README.md):
+Smoke test end-to-end (Docker MySQL+Mongo lokal, 400 assert) ada di [`scripts/testing/`](scripts/testing/README.md):
 
 ```bash
 cd scripts/testing && ./reset.sh && ./test_api.sh && ./test_env_flags.sh && ./test_penginapan.sh && ./reset.sh && ./test_ws.sh
@@ -194,3 +204,11 @@ cd scripts/testing && ./reset.sh && ./test_api.sh && ./test_env_flags.sh && ./te
 - **API**: [`docs/api.md`](docs/api.md) — daftar endpoint lengkap seluruh modul
 - **API Penginapan (khusus frontend)**: [`docs/api-penginapan.md`](docs/api-penginapan.md) — ringkas, contoh request/response, aturan & jebakan; dikirim ke agent/pengembang frontend penginapan
 - **Instruksi agent/kontributor**: [`AGENTS.md`](AGENTS.md) — wajib dibaca; setiap perubahan kode harus memperbarui README ini, `AGENTS.md`, dan `docs/api.md`.
+
+
+## Monitoring Device Gabungan
+
+Menu **Device** (`/admin/device`) menampilkan gabungan mesin vending (`type=vending`) dan device digital signage (`type=signage`) dari satu tabel `devices` (migration `019`). Data diambil dari `GET /devices` dengan filter `type`, `q`, `status`, serta paginasi. Kolom metrik (`cpu_percent`, `memory_percent`, `disk_percent`, `last_metric_at`) tersedia di tabel `devices` untuk pengembangan monitoring berikutnya; endpoint `/signage/devices/stats` tidak ada.
+
+---
+*Fitur monitoring grafik ditambahkan pada [TANGGAL]*

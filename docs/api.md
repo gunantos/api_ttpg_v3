@@ -20,10 +20,24 @@ Sumber kebenaran route: `internal/routes/routes.go`. **Update file ini setiap ad
 | GET | `/ws` | JWT via query `?token=` (public route, auth di handler) |
 | GET | `/docs` | Tanpa auth (public) — halaman dokumentasi interaktif (HTML, contoh kode cURL/PHP/Python/Node/Go) |
 | GET | `/activity` | Tanpa auth (public) — halaman riwayat log request user (HTML; data diambil via `?token=`) |
+| GET | `/login` | Tanpa auth (public) — halaman login username/password (HTML; submit → `POST /auth`, token di `localStorage`) |
+| GET | `/admin`, `/admin/{application,device,boarding,boardingpass,penginapan,gate,activity,vending,vending/media,vending/playlists,digital-signage}` | Tanpa auth di server — console HTML dengan guard JWT di klien (redirect `/login` bila token tidak ada). Sidebar: Utama / Application (Device, Vending dengan tab Config/Screensaver, Digital Signage dengan tab Config/Screensaver/Media) / Sistem |
 | GET | `/activity/logs` | Seragam† — API log (JSON, paginasi + filter) |
+| GET | `/devices` | Seragam† — monitoring gabungan vending + digital signage (`type`, `q`, `status`, paginasi) |
 | GET | `/vending/config?machine_id=` | Seragam† — bundle config mesin (auto-register) |
 | POST | `/vending/device/status` | Seragam† — heartbeat mesin (30 detik) |
-| GET | `/vending/media` | Seragam† — katalog media attract (opsional) |
+| GET | `/vending/media` | Seragam† — katalog media attract (opsional; `enabled=1`; `?machine_id=` memfilter screensaver yang ditargetkan) |
+| GET | `/vending/admin/media` | Admin — daftar media (semua status; filter `purpose=media\|screensaver`; tiap item punya `device_ids`) |
+| GET | `/vending/admin/media/:id` | Admin — detail media |
+| POST | `/vending/admin/media` | Admin — upload file media (multipart `file`, `purpose`, opsional `device_ids` berulang) |
+| POST | `/vending/admin/media/import` | Admin — impor URL / unduh YouTube (JSON `device_ids` opsional) |
+| PUT | `/vending/admin/media/:id` | Admin — edit media (`type`,`url`,`order`,`enabled`,`purpose`,`device_ids`) |
+| DELETE | `/vending/admin/media/:id` | Admin — hapus media |
+| GET | `/uploads/vending/<file>` | Public — file media hasil upload/unduh |
+| GET | `/vending/machines` | Seragam† — daftar device vending (paginasi + `q`, `status`) |
+| POST | `/vending/machines` | Seragam† — buat mesin vending |
+| PUT | `/vending/machines/:id` | Seragam† — update mesin vending |
+| DELETE | `/vending/machines/:id` | Seragam† — hapus mesin vending |
 | POST | `/gate` | Seragam† |
 | POST | `/checkin-mandiri` | Seragam† |
 | GET | `/boardingpass` | Seragam† |
@@ -54,6 +68,10 @@ Sumber kebenaran route: `internal/routes/routes.go`. **Update file ini setiap ad
 | GET | `/penginapan/payment-gateway` | JWT — info gateway aktif (provider, configured) |
 | GET | `/penginapan/qris` | JWT (AuthMiddleware) |
 | GET | `/penginapan/room-histories` | JWT (AuthMiddleware) |
+| GET | `/signage/devices` | Seragam† — daftar device digital signage (paginasi + `q`, `status`) |
+| POST | `/signage/devices` | Seragam† — buat device digital signage |
+| PUT | `/signage/devices/:id` | Seragam† — update device digital signage |
+| DELETE | `/signage/devices/:id` | Seragam† — hapus device digital signage |
 
 Total 46 endpoint penginapan: 43 di group `/penginapan` + 3 public (`GET /penginapan/payments/:id/receipt`, `POST /penginapan/webhooks/midtrans`, `POST /penginapan/webhooks/xendit`) — detail dan body request di bagian [Penginapan](#penginapan).
 
@@ -91,7 +109,7 @@ Setelah identitas valid, middleware mengecek baris `api_url` yang cocok **method
 
 Rute **tanpa** baris `api_url` menerima skema apa pun (aturan hanya berlaku bila baris ada — keputusan: ketat saat ada, bebas saat tidak ada).
 
-Setiap request (termasuk yang gagal) dicatat **async** ke `ttpg_users.logs`: `uri`, `method`, `params` (JSON `{"query","body"}` — query & body sudah **di-redaksi**: field rahasia seperti `password`/`secret`/`token`/`api_key` jadi `[REDACTED]`; body dibaca maks 16KB), `api_key`, `ip_address`, `time`, `rtime`, `authorized` (`y`/`n`), `response_code`, `id_user`, `po_id`, `access_by` (skema), `date`. Log **dihapus otomatis** lebih tua dari `LOG_RETENTION_DAYS` (default 30 hari; `0` = nonaktif) — pembersihan jalan tiap jam dan saat server start. Lihat bagian [Aktivitas & Log](#aktivitas--log-tampilan-user).
+Setiap request (termasuk yang gagal) dicatat **async** ke `ttpg_users.logs`: `uri`, `method`, `params` (JSON `{"query","body"}` — query & body sudah **di-redaksi**: field rahasia seperti `password`/`secret`/`token`/`api_key` jadi `[REDACTED]`; prefix body maks 16KB untuk log — body utuh tetap diteruskan ke handler; multipart tidak dibaca), `api_key`, `ip_address`, `time`, `rtime`, `authorized` (`y`/`n`), `response_code`, `id_user`, `po_id`, `access_by` (skema), `date`. Log **dihapus otomatis** lebih tua dari `LOG_RETENTION_DAYS` (default 30 hari; `0` = nonaktif) — pembersihan jalan tiap jam dan saat server start. Lihat bagian [Aktivitas & Log](#aktivitas--log-tampilan-user).
 
 Endpoint **public** (tanpa auth): `POST /auth`, `/boarding/print/:code` (+alias), `/penginapan/payments/:id/receipt`, `/penginapan/webhooks/midtrans`, `/penginapan/webhooks/xendit`, `/ws` (JWT via query `?token=`), `/docs`, `/activity`.
 
@@ -133,7 +151,7 @@ Error:
 Request:
 
 ```json
-{ "username": "admin", "password": "admin123" }
+{ "username": "admin", "password": "Admin123" }
 ```
 
 Response `200`:
@@ -521,6 +539,192 @@ Aturan bisnis:
 
 ### Configs & lookups
 
+**Cek konfigurasi gateway:**
+
+```http
+GET /penginapan/payment-gateway   → {"data":{"provider":"midtrans","configured":true}}
+```
+
+Jika belum dikonfigurasi → `404 NOT_CONFIGURED` dengan detail cara menambah config via `POST /penginapan/configs`.
+
+**Dropdown Metode & Sumber:**
+
+```http
+GET /penginapan/payment-methods   → [{id, code:"cash", name:"Tunai", ...}]
+GET /penginapan/purchase-sources  → [{id, code:"langsung", name:"Langsung", ...}]
+```
+
+- `payment-methods`: `cash`, `qris`, `transfer`, `debit`, `lainnya`
+- `purchase-sources`: `langsung`, `mesin`
+
+**Check-in dengan Pembayaran:**
+
+```http
+POST /penginapan/guests
+```
+
+```json
+{
+  "guests": [
+    {"room_id": 1, "name": "Budi", "nik": "3175...", "gender": "pria", "harga": 100000}
+  ],
+  "payment": {
+    "amount": 180000, "payment_method_id": 2, "source_id": 2,
+    "status": "pending",
+    "allocations": [{"guest_index": 0, "amount": 90000}, {"guest_index": 1, "amount": 90000}]
+  }
+}
+```
+
+- `payment` opsional; `status` default `lunas`. 2+ tamu → wajib `allocations` (total = amount). 1 tamo → alokasi otomatis.
+
+**Tagihan Pembayaran:**
+
+```http
+PUT /penginapan/payments/3   {"status":"lunas"}      # lunas, paid_at terisi
+PUT /penginapan/payments/3   {"amount":20000}        # turunkan nominal (409 bila < total alokasi)
+DELETE /penginapan/payments/3                         # void → status "batal" (409 bila sudah batal)
+```
+
+- `status: "lunas"` → tamu `lunas` jika `total_bayar >= harga`.
+- `amount` < total alokasi → `409 Conflict`.
+- `DELETE` → `status: "batal"`.
+
+**Payment Gateway (Midtrans & Xendit):**
+
+Cek dulu:
+
+```http
+GET /penginapan/payment-gateway   → {"data":{"provider":"midtrans","configured":true}}
+```
+
+Jika belum → `404 NOT_CONFIGURED`, detail cara konfigurasi.
+
+##### Midtrans (QRIS)
+
+**Charge:**
+
+```http
+POST /penginapan/payments/:id/pay   (JWT auth)
+```
+
+Request:
+
+```json
+{"amount": 180000, "payment_method_id": 2, "source_id": 2}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "payment_id": 3,
+    "provider": "midtrans",
+    "external_id": "TPG-PAY-3-1730000000",
+    "qr_string": "00020101021126610014COM.GO-JEK.WWW...",
+    "gateway_status": "pending",
+    "expires_at": "2026-12-31 23:59:59"
+  }
+}
+```
+
+- `amount` wajib sesuai `payment.amount` → `403` jika tidak sesuai.
+- `gateway` diisi midtrans, `qr_string` disimpan, `gateway_status = "pending"`.
+- Idempoten: bila sudah ada QRIS pending → `200` kembali data lama.
+
+**Webhook Midtrans:**
+
+```http
+POST /penginapan/webhooks/midtrans   (public, tanpa auth)
+```
+
+Body JSON:
+
+```json
+{"order_id": "TPG-PAY-3-1730000000", "status_code": "settlement", "gross_amount": "180000", "signature_key": "<hash>"}
+```
+
+Verifikasi: `SHA512(order_id + status_code + gross_amount + server_key)` → cocok = valid.
+
+Response sukses:
+
+```json
+{"success": true, "data": {"status": "ok", "payment_id": 3, "payment_status": "lunas"}}
+```
+
+Hasil: payment `status: "lunas"`, `paid_at` di-set, `gateway_status: "settlement"`.
+- `cancel`/`deny` → hanya update `gateway_status`, status tetap `pending`.
+- `expire` → `gateway_status: "expired"`.
+- Signature salah → `401`.
+- Unknown `external_id` → `404`.
+- Jumlah tidak sesuai → `403`.
+
+##### Xendit (QRIS)
+
+**Charge:**
+
+```http
+POST /penginapan/payments/:id/pay   (JWT auth)
+```
+
+Request body:
+
+```json
+{"amount": 180000}
+```
+
+- Gunakan `Authorization: Basic base64(secret:)` + header `api-version: 2022-07-31`.
+
+**Webhook Xendit:**
+
+```http
+POST /penginapan/webhooks/xendit   (public, tanpa auth)
+```
+
+Header: `X-Callback-Token`.
+Verifikasi: cek header + status `PAID`/`SETTLED` → `gateway_status: "paid"`, `status: "lunas"`.
+
+- `gross_amount` ≠ `amount` → `403`.
+- Signature/timestamp tidak valid → `401`.
+
+##### QRIS Statis (dari config)
+
+```http
+GET /penginapan/qris   (JWT auth)
+```
+
+Response:
+
+```json
+{"data":{"qr_string":"00020101021126610014COM.GO-JEK.WWW..."}}
+```
+
+- Config `qris_payload` wajib diisi di `POST /penginapan/configs`.
+- Jika belum → `404 NOT_CONFIGURED` dengan petunjuk.
+- Digunakan saat check-in: tampilkan QR → tamu scan → `PUT /payments/:id {"status":"lunas"}` → struk.
+
+**Struk Pembayaran (HTML, public):**
+
+```js
+window.open(`${BASE}/penginapan/payments/3/receipt`);      // tampil struk
+window.open(`${BASE}/penginapan/payments/3/receipt?autoprint=1`); // auto print
+```
+
+- Public, tanpa auth. Nama hotel dari config `nama_hotel` (fallback `PENGINAPAN`).
+- Setiap tamu ada baris alokasi; status `batal` → cap `DIBATALKAN`.
+- `?autoprint=1` → `window.print()`.
+- Error (400/404/500) tetap format standar JSON.
+
+**Riwayat & Filter:**
+
+```http
+GET /penginapan/payments?guest_id=1&status=lunas
+```
+
+- Filter `status=lunas|pending|batal`, `guest_id`.
+
 | Method & path | Keterangan |
 |---------------|------------|
 | `GET /penginapan/configs`, `GET /configs/key/:key` · `POST /configs` · `PUT/DELETE /configs/:id` | Config key/value (`key_configs`, `value_configs`) |
@@ -704,6 +908,7 @@ Halaman **`GET /activity`** (public, HTML) menampilkan riwayat request milik use
 | `method` | `GET`/`POST`/`PUT`/`DELETE` |
 | `code` | filter response_code persis (mis. `403`) |
 | `path` | pencarian substring di `uri` |
+| `q` | pencarian teks pada `uri` / `ip_address` / `access_by` |
 | `authorized` | `y` / `n` |
 | `from`, `to` | rentang tanggal `YYYY-MM-DD` (inclusive) |
 | `user_id` | **admin saja** — filter log user tertentu; selain itu user biasa selalu hanya melihat log miliknya (`id_user`-nya sendiri) |
@@ -726,9 +931,9 @@ Respons memakai format standar + `pagination` (`page`, `limit`, `total`, `total_
 
 ## Vending (mesin OTOMAT)
 
-Tiga endpoint untuk client mesin (auth seragam† — contoh memakai `X-TTPG-KEY`). Data di DB `ttpg`: `vending_machines`, `vending_configs`, `vending_media` — migration `migrations/mysql/006_create_ttpg_vending.sql` (**jalankan manual di produksi**, lokal otomatis via `reset.sh`).
+Endpoint untuk client mesin (auth seragam† — contoh memakai `X-TTPG-KEY`) dan endpoint admin pengelolaan media. Device vending & digital signage ada di satu tabel `devices` (`type` = `vending`|`signage`); data lama disalin oleh migration `019_create_ttpg_devices.sql`. Config/media/playlist tetap di tabelnya: `vending_configs`, `vending_media`, `vending_playlists`, `vending_playlist_items`, `vending_machine_playlists`, `vending_play_logs` — migration `migrations/mysql/006_create_ttpg_vending.sql` + `018_upgrade_vending_media_playlist.sql` + `019_create_ttpg_devices.sql` + `020_vending_screensaver_devices.sql` (**jalankan manual di produksi**, lokal otomatis via `reset.sh`).
 
-**Auto-register**: `machine_id` yang belum ada di `vending_machines` dibuat otomatis dengan `status=pending` (approve mesin via admin panel — menyusul); heartbeat pun begitu.
+**Auto-register**: `machine_id` yang belum ada di `devices` (`type='vending'`) dibuat otomatis dengan `status=pending` (approve mesin via admin panel — menyusul); heartbeat pun begitu.
 
 **Config bundle** disimpan per baris: global `machine_id='__global__'` (di-seed migration: versi `cfg-20261015-1`, `updated_at` 2026-10-15 10:00:00) + opsional baris override per mesin. **Server yang meng-merge** (client tidak merge lokal): objek di-merge rekursif (field global yang tidak di-override tetap), array/scalar diganti oleh override; `version`/`updated_at` diambil dari baris override bila ada, selain itu dari global.
 
@@ -789,14 +994,46 @@ Interval otomatis **30 detik**. Heartbeat mengisi `last_seen_at` (server time) d
 
 ### GET `/vending/media` (opsional)
 
-Daftar konten attract — client boleh langsung memakai `attract.sources` dari bundle config; endpoint ini untuk pemisahan katalog media bila diperlukan. Hanya `enabled=1`, urut `order`.
+Daftar konten attract — client boleh langsung memakai `attract.sources` dari bundle config; endpoint ini untuk pemisahan katalog media bila diperlukan. Hanya `enabled=1`, urut `order`. Query opsional `machine_id` memfilter screensaver: screensaver tanpa assignment = semua device; screensaver dengan assignment hanya dikirim ke device yang terdaftar.
 
 ```json
 { "success": true, "message": "Daftar media attract",
-  "data": [ {"id": 1, "type": "video", "url": "https://.../a.mp4", "order": 1, "checksum": "sha256:..."} ] }
+  "data": [ {"id": 1, "type": "video", "purpose": "media", "url": "/uploads/vending/vm_...mp4", "order": 1, "checksum": "sha256:...", "device_ids": []} ] }
 ```
 
-`401` tanpa key/token (ketiga endpoint).
+`device_ids` kosong = semua device. `401` tanpa key/token.
+
+### Admin media vending (auth JWT role `admin`)
+
+Dipakai tab **Screensaver** di `/admin/vending` (tab Media sudah dihapus dari UI; konten `purpose=media` tetap bisa dikelola lewat API). `purpose` = `media` (default) atau `screensaver`; semua endpoint admin menolak role selain `admin` (403). `media` = konten utama/attract loop, `screensaver` = tampilan saat idle — filenya terpisah per purpose. Screensaver dapat ditargetkan ke device tertentu (`device_ids`); tanpa assignment = semua device.
+
+| Method | Path | Body / Query | Ket |
+|---|---|---|---|
+| GET | `/vending/admin/media` | `?purpose=media\|screensaver` (opsional) | semua status, urut `order` |
+| GET | `/vending/admin/media/:id` | — | detail satu media |
+| POST | `/vending/admin/media` | multipart `file` + `purpose` + `device_ids` (opsional, berulang) | upload gambar/video (maks 100MB) |
+| POST | `/vending/admin/media/import` | JSON `{url, purpose, device_ids?}` | YouTube/Instagram/TikTok/Facebook/Vimeo → diunduh **yt-dlp**; URL file langsung → diunduh; halaman HTML → tipe `website` |
+| PUT | `/vending/admin/media/:id` | JSON `{type,url,order,enabled,purpose,device_ids}` | field opsional; `device_ids: []` = semua device; `enabled` menerima bool/0-1/"true"/"false" |
+| DELETE | `/vending/admin/media/:id` | — | 409 bila masih dipakai item playlist |
+
+- File disimpan di `$UPLOAD_DIR/vending` dan disajikan publik di `/uploads/vending/<file>` (hanya folder ini yang public — KTP/boardingpass tetap butuh JWT).
+- Upload multipart berapa pun ukurannya (≤100MB) diteruskan utuh ke handler; middleware log hanya menyimpan prefix 16KB.
+- `source_url` menyimpan URL asal (YouTube) untuk jejak; `checksum` = SHA-256 file.
+- Download YouTube memakai `yt-dlp` (+ `ffmpeg` bila ada; bisa dioverride `YT_DLP_PATH`/`FFMPEG_PATH`), batas 100MB, timeout 5 menit. Jika `yt-dlp` tidak ada → 400 `yt-dlp belum tersedia di server`.
+- Kontrak: `type` ∈ `image`/`video`/`website`; URL hasil upload selalu path lokal `/uploads/vending/...`.
+
+### GET `/vending/machines`
+
+Daftar device/mesin terdaftar (dipakai tabel menu Device di console admin). Query: `q` (cari `machine_id`/`name`), `status` (`active`/`pending`/`disabled`), `limit` (1–200, default 20), `offset`. Respons format standar + `pagination`.
+
+```json
+{ "success": true, "message": "Daftar device",
+  "data": [ {"id": 1, "machine_id": "PENDING_1", "name": "", "status": "pending",
+      "app_version": "3.0.0-beta.1", "config_version": "cfg-20261015-1",
+      "last_sync_at": "2026-10-24T11:15:00Z", "last_seen_at": "2026-10-24T11:16:30Z",
+      "created_at": "2026-10-24T11:06:00Z", "updated_at": "2026-10-24T11:16:30Z"} ],
+  "pagination": { "page": 1, "limit": 20, "total": 1, "total_pages": 1 } }
+```
 
 ---
 
