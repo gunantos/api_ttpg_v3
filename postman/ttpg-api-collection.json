@@ -1,0 +1,437 @@
+{
+  "info": {
+    "_postman_id": "ttpg-api-collection-v2",
+    "name": "TTPG API Collection",
+    "schema": "https://schema.getpostman.com/json/collection/2.4.0",
+    "host": ["api-v3.terminalpulogebang.com"],
+    "_exporter_id": "v1.0.0",
+    "version": "2.4.0"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth - Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "json",
+              "json": {
+                "username": "admin",
+                "password": "admin123"
+              }
+            },
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/auth",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["auth"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment Gateway",
+      "item": [
+        {
+          "name": "GET /penginapan/payment-gateway - Cek Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/penginapan/payment-gateway",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["penginapan", "payment-gateway"]
+            }
+          }
+        },
+        {
+          "name": "POST /penginapan/configs - Set Midtrans Sandbox",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": {
+                "key_configs": "midtrans_env",
+                "value_configs": "sandbox"
+              }
+            },
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/penginapan/configs",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["penginapan", "configs"]
+            }
+          }
+        },
+        {
+          "name": "POST /penginapan/configs - Set Server Key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": {
+                "key_configs": "midtrans_server_key",
+                "value_configs": "SB-Mid-server-RrG9ZF5shSERpsFiXfZOIZnh"
+              }
+            },
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/penginapan/configs",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["penginapan", "configs"]
+            }
+          }
+        },
+        {
+          "name": "POST /penginapan/configs - Set QRIS Payload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": {
+                "key_configs": "qris_payload",
+                "value_configs": "00020101021126610014COM.GO-JEK.WWW01189360091432506719960210G1234567890303UMI51440014ID.CO.QRIS.WWW0215ID1020012345678900303UMI5204581253033605802ID5908TTPG PGN6007JAKARTA6105121106304ABCD"
+              }
+            },
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/penginapan/configs",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["penginapan", "configs"]
+            }
+          }
+        },
+        {
+          "name": "GET /penginapan/qris - Ambil QRIS Statis",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/penginapan/qris",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["penginapan", "qris"]
+            }
+          }
+        },
+        {
+          "name": "POST /penginapan/payments - Buat Pembayaran",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": {
+                "guest_ids": [1],
+                "amount": 180000,
+                "payment_method_id": 2,
+                "source_id": 2
+              }
+            },
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/penginapan/payments",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["penginapan", "payments"]
+            }
+          }
+        },
+        {
+          "name": "POST /penginapan/payments/:id/pay - Charge QRIS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{auth_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": {
+                "amount": 180000,
+                "payment_method_id": 2,
+                "source_id": 2
+              }
+            },
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/penginapan/payments/1/pay",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["penginapan", "payments", "1", "pay"]
+            }
+          }
+        },
+        {
+          "name": "POST /penginapan/webhooks/midtrans - Verifikasi Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": {
+                "order_id": "TPG-PAY-1-1730000000",
+                "status_code": "settlement",
+                "gross_amount": "180000",
+                "signature_key": "<generate_sha512>"
+              }
+            },
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/penginapan/webhooks/midtrans",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["penginapan", "webhooks", "midtrans"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Digital Signage",
+      "item": [
+        {
+          "name": "GET /signage/devices - Daftar Device",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/signage/devices",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["signage", "devices"]
+            }
+          }
+        },
+        {
+          "name": "POST /signage/devices - Buat Device",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": {
+                "device_id": "lobby-1",
+                "name": "Lobby Screen",
+                "location": "Gedung A",
+                "status": "pending"
+              }
+            },
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/signage/devices",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["signage", "devices"]
+            }
+          }
+        },
+        {
+          "name": "GET /signage/sync - Sync Manifest",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Device-ID",
+                "value": "lobby-1"
+              },
+              {
+                "key": "X-Device-Token",
+                "value": "<device_token>"
+              }
+            ],
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/signage/sync",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["signage", "sync"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vending",
+      "item": [
+        {
+          "name": "GET /vending/config - Daftar Config Mesin",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/vending/config?machine_id=",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["vending", "config"]
+            }
+          }
+        },
+        {
+          "name": "POST /vending/device/status - Heartbeat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": {
+                "app_version": "1.0.0",
+                "config_version": "1",
+                "last_sync_at": "2026-10-30T10:00:00Z",
+                "extra": {}
+              }
+            },
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/vending/device/status",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["vending", "device", "status"]
+            }
+          }
+        },
+        {
+          "name": "GET /vending/media - Daftar Media",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/vending/media",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["vending", "media"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Boardingpass & Gate",
+      "item": [
+        {
+          "name": "POST /gate - Gate Entry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": {
+                "noreg": "CM1234567890ABC",
+                "fnc": "gatein"
+              }
+            },
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/gate",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["gate"]
+            }
+          }
+        },
+        {
+          "name": "POST /checkin-mandiri - Checkin Mandiri",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": {
+                "noreg": "CM9876543210ZXY",
+                "room_id": 1
+              }
+            },
+            "url": {
+              "raw": "https://api-v3.terminalpulogebang.com/checkin-mandiri",
+              "host": ["api-v3.terminalpulogebang.com"],
+              "path": ["checkin-mandiri"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "device_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
